@@ -1,8 +1,10 @@
-// app/products/page.tsx
+// app/products/category/[category]/page.tsx
 
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Product, FilterState } from '@/lib/types';
 import { getProducts } from '@/lib/supabase';
 import { 
@@ -10,17 +12,28 @@ import {
   sortProducts, 
   getAllColors, 
   getPriceRange,
-  addSlugToProduct 
+  addSlugToProduct,
+  parseCategorySlug
 } from '@/utils/helpers';
 import ProductCard from '@/components/products/ProductCard';
 import FilterSidebar from '@/components/products/FilterSidebar';
 import SearchBar from '@/components/SearchBar';
-import { SlidersHorizontal, X } from 'lucide-react';
+import { SlidersHorizontal, X, ChevronLeft } from 'lucide-react';
 
-export default function ProductsPage() {
+export default function CategoryPage() {
+  const params = useParams();
+  const router = useRouter();
+  const categorySlug = params.category as string;
+
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [categoryProducts, setCategoryProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [categoryInfo, setCategoryInfo] = useState<{ 
+    gender: string | null; 
+    category: string;
+    isGenderSpecific: boolean;
+  } | null>(null);
   
   const [filters, setFilters] = useState<FilterState>({
     gender: [],
@@ -36,32 +49,73 @@ export default function ProductsPage() {
   useEffect(() => {
     async function fetchProducts() {
       try {
+        // Parse category slug
+        const parsedCategory = parseCategorySlug(categorySlug);
+        setCategoryInfo(parsedCategory);
+
+        // Fetch all products
         const products = await getProducts();
         const productsWithSlugs = products.map(addSlugToProduct);
         setAllProducts(productsWithSlugs);
+
+        let filtered: Product[];
+
+        if (parsedCategory.isGenderSpecific) {
+          // Gender-specific: filter by exact category (e.g., "Male-Jersey")
+          filtered = productsWithSlugs.filter(p => p.category === parsedCategory.category);
+        } else {
+          // Gender-neutral: filter by category name across both genders
+          // E.g., "Jersey" matches both "Male-Jersey" and "Female-Jersey"
+          filtered = productsWithSlugs.filter(p => {
+            const categoryPart = p.category.split('-')[1]; // Get "Jersey" from "Male-Jersey"
+            return categoryPart?.toLowerCase() === parsedCategory.category.toLowerCase();
+          });
+        }
         
-        // Set initial price range based on products
-        const range = getPriceRange(productsWithSlugs);
-        setFilters(prev => ({ ...prev, priceRange: range }));
+        if (filtered.length === 0) {
+          // Category doesn't exist, redirect to all products
+          router.push('/products');
+          return;
+        }
+
+        setCategoryProducts(filtered);
+        
+        // Set initial price range and pre-select the category/gender
+        const range = getPriceRange(filtered);
+        if (parsedCategory.isGenderSpecific) {
+          setFilters(prev => ({ 
+            ...prev, 
+            priceRange: range,
+            categories: [parsedCategory.category] // Pre-select this specific category
+          }));
+        } else {
+          // For gender-neutral, just set price range
+          setFilters(prev => ({ 
+            ...prev, 
+            priceRange: range
+          }));
+        }
+
       } catch (error) {
         console.error('Error fetching products:', error);
+        router.push('/products');
       } finally {
         setLoading(false);
       }
     }
 
     fetchProducts();
-  }, []);
+  }, [categorySlug, router]);
 
-  const priceRange = getPriceRange(allProducts);
-  const availableColors = getAllColors(allProducts);
-  const filteredProducts = filterProducts(allProducts, filters);
+  const priceRange = getPriceRange(categoryProducts);
+  const availableColors = getAllColors(categoryProducts);
+  const filteredProducts = filterProducts(categoryProducts, filters);
   const sortedProducts = sortProducts(filteredProducts, filters.sortBy);
 
   const handleResetFilters = () => {
     setFilters({
       gender: [],
-      categories: [],
+      categories: categoryInfo?.isGenderSpecific ? [categoryInfo.category] : [],
       priceRange: priceRange,
       sizes: [],
       colors: [],
@@ -82,18 +136,56 @@ export default function ProductsPage() {
     );
   }
 
+  if (!categoryInfo) {
+    return null;
+  }
+
+  // Display names
+  const categoryDisplayName = categoryInfo.isGenderSpecific 
+    ? categoryInfo.category.split('-').pop() // "Jersey" from "Male-Jersey"
+    : categoryInfo.category; // "Jersey"
+  
+  const genderDisplayName = categoryInfo.gender === 'Male' ? 'Mens' : 
+                           categoryInfo.gender === 'Female' ? 'Womens' : 
+                           null;
+
+  const pageTitle = categoryInfo.isGenderSpecific 
+    ? `${genderDisplayName} ${categoryDisplayName}`
+    : categoryDisplayName;
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <h1 className="text-3xl font-bold mb-6">All Products</h1>
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-sm mb-4">
+            <Link href="/products" className="text-gray-600 hover:text-gray-900">
+              Products
+            </Link>
+            <span className="text-gray-400">/</span>
+            {genderDisplayName && (
+              <>
+                <span className="text-gray-900">{genderDisplayName}</span>
+                <span className="text-gray-400">/</span>
+              </>
+            )}
+            <span className="text-gray-900">{categoryDisplayName}</span>
+          </div>
+
+          <h1 className="text-3xl font-bold mb-2">{pageTitle}</h1>
+          {!categoryInfo.isGenderSpecific && (
+            <p className="text-gray-600 mb-6">
+              Showing products for both mens and womens
+            </p>
+          )}
           
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 mt-6">
             <div className="flex-1">
               <SearchBar
                 value={filters.searchQuery}
                 onChange={(value) => setFilters({ ...filters, searchQuery: value })}
+                placeholder={`Search ${categoryDisplayName?.toLowerCase()}...`}
               />
             </div>
             
@@ -122,6 +214,15 @@ export default function ProductsPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back to Products Link */}
+        <Link
+          href="/products"
+          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+        >
+          <ChevronLeft className="w-5 h-5" />
+          Back to all products
+        </Link>
+
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Desktop Sidebar */}
           <aside className="hidden lg:block w-64 flex-shrink-0">
@@ -168,7 +269,7 @@ export default function ProductsPage() {
             <div className="mb-6">
               <p className="text-gray-600">
                 Showing <span className="font-semibold">{sortedProducts.length}</span> of{' '}
-                <span className="font-semibold">{allProducts.length}</span> products
+                <span className="font-semibold">{categoryProducts.length}</span> products
               </p>
             </div>
 
@@ -180,7 +281,7 @@ export default function ProductsPage() {
                   onClick={handleResetFilters}
                   className="text-gray-900 hover:underline font-medium"
                 >
-                  Clear all filters
+                  Clear filters
                 </button>
               </div>
             ) : (

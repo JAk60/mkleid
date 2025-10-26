@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { Navbar } from "@/components/navbar"
 import { useState } from "react"
+import HeroSection from "@/components/HeroSection"
 
 export default function Home() {
   const [menCarouselIndex, setMenCarouselIndex] = useState(0)
@@ -59,77 +60,10 @@ export default function Home() {
 
   return (
     <>
-      <Navbar />
+      {/* <Navbar /> */}
       <main className="min-h-screen bg-white">
         {/* Hero Section */}
-        <section className="py-8 md:py-12 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="grid md:grid-cols-3 gap-6">
-              {/* Main Hero - Left Side */}
-              <div className="md:col-span-2 relative overflow-hidden rounded-lg bg-gray-100 h-96 md:h-full flex items-center justify-center group">
-                <div
-                  className="absolute inset-0 bg-cover bg-center"
-                  style={{ backgroundImage: "url('/offers-banner.png')" }}
-                ></div>
-                <div className="absolute inset-0 bg-black/30"></div>
-                <div className="relative z-10 text-center text-white px-6">
-                  <div className="inline-block bg-yellow-500 text-gray-900 px-4 py-2 rounded-full text-sm font-bold mb-4">
-                    SALE UP TO 40% OFF
-                  </div>
-                  <h1 className="text-4xl md:text-5xl font-bold mb-6">Ecommerce Online Store</h1>
-                  <Link
-                    href="/products"
-                    className="inline-block px-8 py-3 bg-yellow-500 hover:bg-yellow-600 text-gray-900 rounded-lg font-bold transition-colors"
-                  >
-                    Shop Now
-                  </Link>
-                </div>
-              </div>
-
-              {/* Side Category Cards - Right Side */}
-              <div className="flex flex-col gap-6">
-                {/* Women Category Card */}
-                <div className="relative overflow-hidden rounded-lg bg-gray-100 h-44 flex items-end justify-between p-6 group cursor-pointer hover:shadow-lg transition-shadow">
-                  <div
-                    className="absolute inset-0 bg-cover bg-center"
-                    style={{ backgroundImage: "url('/woman-shopping.jpg')" }}
-                  ></div>
-                  <div className="absolute inset-0 bg-black/20"></div>
-                  <div className="relative z-10">
-                    <h3 className="text-2xl font-bold text-white mb-1">Women</h3>
-                    <p className="text-white/90 text-sm">New Collection</p>
-                  </div>
-                  <Link
-                    href="/products"
-                    className="relative z-10 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 rounded-lg text-sm font-bold transition-colors"
-                  >
-                    Shop Now
-                  </Link>
-                </div>
-
-                {/* Men Category Card */}
-                <div className="relative overflow-hidden rounded-lg bg-gray-100 h-44 flex items-end justify-between p-6 group cursor-pointer hover:shadow-lg transition-shadow">
-                  <div
-                    className="absolute inset-0 bg-cover bg-center"
-                    style={{ backgroundImage: "url('/man-with-shopping-bags.jpg')" }}
-                  ></div>
-                  <div className="absolute inset-0 bg-black/20"></div>
-                  <div className="relative z-10">
-                    <h3 className="text-2xl font-bold text-white mb-1">Men</h3>
-                    <p className="text-white/90 text-sm">Latest Styles</p>
-                  </div>
-                  <Link
-                    href="/products"
-                    className="relative z-10 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 rounded-lg text-sm font-bold transition-colors"
-                  >
-                    Shop Now
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
+        <HeroSection />
         {/* Product Grid Showcase */}
         <section className="py-12 md:py-16 px-4 sm:px-6 lg:px-8 bg-gray-50">
           <div className="max-w-7xl mx-auto">

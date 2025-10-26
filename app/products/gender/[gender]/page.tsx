@@ -1,26 +1,34 @@
-// app/products/page.tsx
+// app/products/gender/[gender]/page.tsx
 
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Product, FilterState } from '@/lib/types';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Product, FilterState, CATEGORIES } from '@/lib/types';
 import { getProducts } from '@/lib/supabase';
 import { 
   filterProducts, 
   sortProducts, 
   getAllColors, 
   getPriceRange,
-  addSlugToProduct 
+  addSlugToProduct
 } from '@/utils/helpers';
 import ProductCard from '@/components/products/ProductCard';
 import FilterSidebar from '@/components/products/FilterSidebar';
 import SearchBar from '@/components/SearchBar';
-import { SlidersHorizontal, X } from 'lucide-react';
+import { SlidersHorizontal, X, ChevronLeft } from 'lucide-react';
 
-export default function ProductsPage() {
+export default function GenderPage() {
+  const params = useParams();
+  const router = useRouter();
+  const genderParam = params.gender as string;
+
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [genderProducts, setGenderProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [gender, setGender] = useState<'Male' | 'Female' | null>(null);
   
   const [filters, setFilters] = useState<FilterState>({
     gender: [],
@@ -36,31 +44,53 @@ export default function ProductsPage() {
   useEffect(() => {
     async function fetchProducts() {
       try {
+        // Parse gender from URL
+        const genderValue = genderParam === 'mens' ? 'Male' : 
+                           genderParam === 'womens' ? 'Female' : null;
+
+        if (!genderValue) {
+          router.push('/products');
+          return;
+        }
+
+        setGender(genderValue);
+
+        // Fetch all products
         const products = await getProducts();
         const productsWithSlugs = products.map(addSlugToProduct);
         setAllProducts(productsWithSlugs);
+
+        // Filter products by gender
+        const filtered = productsWithSlugs.filter(p => p.gender === genderValue);
+        setGenderProducts(filtered);
         
-        // Set initial price range based on products
-        const range = getPriceRange(productsWithSlugs);
-        setFilters(prev => ({ ...prev, priceRange: range }));
+        // Set initial price range and pre-select the gender
+        const range = getPriceRange(filtered);
+        setFilters(prev => ({ 
+          ...prev, 
+          priceRange: range,
+          gender: [genderValue]
+        }));
+
       } catch (error) {
         console.error('Error fetching products:', error);
+        router.push('/products');
       } finally {
         setLoading(false);
       }
     }
 
     fetchProducts();
-  }, []);
+  }, [genderParam, router]);
 
-  const priceRange = getPriceRange(allProducts);
-  const availableColors = getAllColors(allProducts);
-  const filteredProducts = filterProducts(allProducts, filters);
+  const priceRange = getPriceRange(genderProducts);
+  const availableColors = getAllColors(genderProducts);
+  const filteredProducts = filterProducts(genderProducts, filters);
   const sortedProducts = sortProducts(filteredProducts, filters.sortBy);
 
   const handleResetFilters = () => {
     setFilters({
-      gender: [],
+      gender: gender ? [gender] : [],
       categories: [],
       priceRange: priceRange,
       sizes: [],
@@ -82,18 +112,34 @@ export default function ProductsPage() {
     );
   }
 
+  if (!gender) {
+    return null;
+  }
+
+  const genderDisplayName = gender === 'Male' ? 'Mens' : 'Womens';
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <h1 className="text-3xl font-bold mb-6">All Products</h1>
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-sm mb-4">
+            <Link href="/products" className="text-gray-600 hover:text-gray-900">
+              Products
+            </Link>
+            <span className="text-gray-400">/</span>
+            <span className="text-gray-900">{genderDisplayName}</span>
+          </div>
+
+          <h1 className="text-3xl font-bold mb-6">{genderDisplayName} Collection</h1>
           
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <SearchBar
                 value={filters.searchQuery}
                 onChange={(value) => setFilters({ ...filters, searchQuery: value })}
+                placeholder={`Search ${genderDisplayName.toLowerCase()} products...`}
               />
             </div>
             
@@ -122,6 +168,15 @@ export default function ProductsPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back to Products Link */}
+        <Link
+          href="/products"
+          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+        >
+          <ChevronLeft className="w-5 h-5" />
+          Back to all products
+        </Link>
+
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Desktop Sidebar */}
           <aside className="hidden lg:block w-64 flex-shrink-0">
@@ -168,7 +223,7 @@ export default function ProductsPage() {
             <div className="mb-6">
               <p className="text-gray-600">
                 Showing <span className="font-semibold">{sortedProducts.length}</span> of{' '}
-                <span className="font-semibold">{allProducts.length}</span> products
+                <span className="font-semibold">{genderProducts.length}</span> products
               </p>
             </div>
 
@@ -180,7 +235,7 @@ export default function ProductsPage() {
                   onClick={handleResetFilters}
                   className="text-gray-900 hover:underline font-medium"
                 >
-                  Clear all filters
+                  Clear filters
                 </button>
               </div>
             ) : (
