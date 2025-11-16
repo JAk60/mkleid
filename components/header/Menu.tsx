@@ -24,8 +24,8 @@ const Menu: React.FC<MenuProps> = ({
   const data = [
     { id: 1, name: "Home", url: "/" },
     { id: 2, name: "All Products", url: "/products" },
-    { id: 3, name: "Men", subMenu: true },
-    { id: 4, name: "Women", subMenu: true },
+    { id: 3, name: "Male", subMenu: true },
+    { id: 4, name: "Female", subMenu: true },
   ];
 
   // Timeout refs to prevent immediate closing
@@ -34,12 +34,12 @@ const Menu: React.FC<MenuProps> = ({
 
   const handleMouseEnter = (menuName: string) => {
     // Clear any pending timeouts
-    if (menuName === "Men") {
+    if (menuName === "Male") {
       if (menTimeoutRef.current) clearTimeout(menTimeoutRef.current);
       setShowMenCat(true);
       setShowWomenCat(false);
     }
-    if (menuName === "Women") {
+    if (menuName === "Female") {
       if (womenTimeoutRef.current) clearTimeout(womenTimeoutRef.current);
       setShowWomenCat(true);
       setShowMenCat(false);
@@ -48,12 +48,12 @@ const Menu: React.FC<MenuProps> = ({
 
   const handleMouseLeave = (menuName: string) => {
     // Add delay before closing to prevent accidental closes
-    if (menuName === "Men") {
+    if (menuName === "Male") {
       menTimeoutRef.current = setTimeout(() => {
         setShowMenCat(false);
       }, 150);
     }
-    if (menuName === "Women") {
+    if (menuName === "Female") {
       womenTimeoutRef.current = setTimeout(() => {
         setShowWomenCat(false);
       }, 150);
@@ -74,7 +74,7 @@ const Menu: React.FC<MenuProps> = ({
                 {item.name}
                 <BsChevronDown size={14} />
 
-                {item.name === "Men" && showMenCat && (
+                {item.name === "Male" && showMenCat && (
                   <ul className="bg-white absolute top-6 left-0 min-w-[250px] px-1 py-1 text-black shadow-lg rounded-md z-10">
                     {subMenuMenData.map((submenu) => {
                       return (
@@ -88,7 +88,7 @@ const Menu: React.FC<MenuProps> = ({
                             }
                           }}
                         >
-                          <li className="h-12 flex justify-between items-center px-3 hover:bg-black/[0.03] rounded-md">
+                          <li className="h-12 flex justify-between items-center px-3 hover:bg-white/[0.03] rounded-md">
                             {submenu.name}
                           </li>
                         </Link>
@@ -97,7 +97,7 @@ const Menu: React.FC<MenuProps> = ({
                   </ul>
                 )}
 
-                {item.name === "Women" && showWomenCat && (
+                {item.name === "Female" && showWomenCat && (
                   <ul className="bg-white absolute top-6 left-0 min-w-[250px] px-1 py-1 text-black shadow-lg rounded-md z-10">
                     {subMenuWomenData.map((submenu) => {
                       return (
@@ -111,7 +111,7 @@ const Menu: React.FC<MenuProps> = ({
                             }
                           }}
                         >
-                          <li className="h-12 flex justify-between items-center px-3 hover:bg-black/[0.03] rounded-md">
+                          <li className="h-12 flex justify-between items-center px-3 hover:bg-white/[0.03] rounded-md">
                             {submenu.name}
                           </li>
                         </Link>

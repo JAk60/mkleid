@@ -4,68 +4,80 @@ import Link from "next/link"
 import { Navbar } from "@/components/navbar"
 import { useState } from "react"
 import HeroSection from "@/components/HeroSection"
+import Marquee from "@/components/Marquee"
+import Footer from "@/components/Footer"
+import TrendCate from "@/components/Trending-categories"
 
 export default function Home() {
   const [menCarouselIndex, setMenCarouselIndex] = useState(0)
   const [womenCarouselIndex, setWomenCarouselIndex] = useState(0)
 
   const menProducts = [
-    { id: 1, name: "Men Shirt", image: "/mens-casual-shirt.png" },
-    { id: 2, name: "Men Jeans", image: "/men-jeans.png" },
-    { id: 3, name: "Men Trouser", image: "/men-trouser.jpg" },
-    { id: 4, name: "Men Trouser", image: "/men-trouser.jpg" },
+    { id: 1, name: "Male Shirt", image: "/mens-casual-shirt.png" },
+    { id: 2, name: "Male Jeans", image: "/Male-jeans.png" },
+    { id: 3, name: "Male Trouser", image: "/Male-trouser.jpg" },
+    { id: 4, name: "Male Trouser", image: "/Male-trouser.jpg" },
   ]
 
   const womenProducts = [
-    { id: 5, name: "Women Tods", image: "/women-shoes.jpg" },
-    { id: 6, name: "Women Shirt", image: "/women-shirt.png" },
-    { id: 7, name: "Women Jeans", image: "/diverse-women-wearing-jeans.png" },
-    { id: 8, name: "Women Trouser", image: "/women-trouser.jpg" },
+    { id: 5, name: "Female Tods", image: "/Female-shoes.jpg" },
+    { id: 6, name: "Female Shirt", image: "/Female-shirt.png" },
+    { id: 7, name: "Female Jeans", image: "/diverse-Female-wearing-jeans.png" },
+    { id: 8, name: "Female Trouser", image: "/Female-trouser.jpg" },
   ]
 
   const categoryGrid = [
-    { id: 1, name: "Men Shirt", image: "/mens-casual-shirt.png" },
-    { id: 2, name: "Men Shirt", image: "/mens-casual-shirt.png" },
-    { id: 3, name: "Men Jeans", image: "/men-jeans.png" },
-    { id: 4, name: "Men Trouser", image: "/men-trouser.jpg" },
-    { id: 5, name: "Women Tods", image: "/women-shoes.jpg" },
-    { id: 6, name: "Women Shirt", image: "/women-shirt.png" },
-    { id: 7, name: "Women Jeans", image: "/diverse-women-wearing-jeans.png" },
-    { id: 8, name: "Women Trouser", image: "/women-trouser.jpg" },
+    { id: 1, name: "Male Shirt", image: "/mens-casual-shirt.png" },
+    { id: 2, name: "Male Shirt", image: "/mens-casual-shirt.png" },
+    { id: 3, name: "Male Jeans", image: "/Male-jeans.png" },
+    { id: 4, name: "Male Trouser", image: "/Male-trouser.jpg" },
+    { id: 5, name: "Female Tods", image: "/Female-shoes.jpg" },
+    { id: 6, name: "Female Shirt", image: "/Female-shirt.png" },
+    { id: 7, name: "Female Jeans", image: "/diverse-Female-wearing-jeans.png" },
+    { id: 8, name: "Female Trouser", image: "/Female-trouser.jpg" },
   ]
 
   const latestMen = [
     {
       id: 101,
-      name: "Men Slim Fit Striped Spread Collar Casual Shirt",
+      name: "Male Slim Fit Striped Spread Collar Casual Shirt",
       price: "₹1000",
-      image: "/men-casual-shirt.jpg",
+      image: "/Male-casual-shirt.jpg",
     },
-    { id: 102, name: "Men Slim Low Rise Jeans", price: "₹1000", image: "/men-jeans.png" },
+    { id: 102, name: "Male Slim Low Rise Jeans", price: "₹1000", image: "/Male-jeans.png" },
     {
       id: 103,
-      name: "Men Regular Fit Clean Pure Cotton Trousers",
+      name: "Male Regular Fit Clean Pure Cotton Trousers",
       price: "₹1500",
-      image: "/men-white-trousers.jpg",
+      image: "/Male-white-trousers.jpg",
     },
-    { id: 104, name: "Men Slim Fit Green Cotton Brand Trousers", price: "₹2349", image: "/men-green-trousers.jpg" },
+    { id: 104, name: "Male Slim Fit Green Cotton Brand Trousers", price: "₹2349", image: "/Male-green-trousers.jpg" },
   ]
 
   const latestWomen = [
-    { id: 201, name: "Casual Regular Sleeves Solid Women Top", price: "₹400", image: "/women-black-top.jpg" },
-    { id: 202, name: "Women Flared High Rise Jeans", price: "₹1299", image: "/women-flared-jeans.jpg" },
-    { id: 203, name: "Women Regular Fit Solid Casual Shirt", price: "₹2199", image: "/women-black-shirt.jpg" },
-    { id: 204, name: "Women Relaxed Black Lycra Brand Trousers", price: "₹1699", image: "/women-black-pants.jpg" },
+    { id: 201, name: "Casual Regular Sleeves Solid Female Top", price: "₹400", image: "/Female-black-top.jpg" },
+    { id: 202, name: "Female Flared High Rise Jeans", price: "₹1299", image: "/Female-flared-jeans.jpg" },
+    { id: 203, name: "Female Regular Fit Solid Casual Shirt", price: "₹2199", image: "/Female-black-shirt.jpg" },
+    { id: 204, name: "Female Relaxed Black Lycra Brand Trousers", price: "₹1699", image: "/Female-black-pants.jpg" },
   ]
+
+  const messages = [
+    { icon: '🎉', text: 'EXTRA 5% OFF FOR PREPAID' },
+    { icon: '✈️', text: 'FREE SHIPPING ₹2000+' },
+    { icon: '🎊', text: 'HIT ₹5K FOR 20%' },
+    { icon: '💳', text: 'EXTRA 5% OFF FOR PREPAID' },
+  ];
+
 
   return (
     <>
-      {/* <Navbar /> */}
+      {/*  */}
       <main className="min-h-screen bg-white">
+        <Marquee messages={messages} />
         {/* Hero Section */}
         <HeroSection />
         {/* Product Grid Showcase */}
-        <section className="py-12 md:py-16 px-4 sm:px-6 lg:px-8 bg-gray-50">
+        {/* <section className="py-12 md:py-16 px-4 sm:px-6 lg:px-8 bg-gray-50">
           <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {categoryGrid.map((product) => (
@@ -79,7 +91,7 @@ export default function Home() {
                     alt={product.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors flex items-center justify-center">
+                  <div className="absolute inset-0 bg-white/40 group-hover:bg-white/50 transition-colors flex items-center justify-center">
                     <span className="bg-white text-gray-900 px-4 py-2 rounded-full font-bold text-sm">
                       {product.name}
                     </span>
@@ -88,13 +100,13 @@ export default function Home() {
               ))}
             </div>
           </div>
-        </section>
-
-        {/* Men's Latest Fashion */}
+        </section> */}
+<TrendCate />
+        {/* Male's Latest Fashion */}
         <section className="py-12 md:py-16 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-center gap-4 mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-center">Men's Latest Fashion</h2>
+              <h2 className="text-3xl md:text-4xl font-bold text-center">Male's Latest Fashion</h2>
               <div className="flex gap-2">
                 <button
                   onClick={() => setMenCarouselIndex(Math.max(0, menCarouselIndex - 1))}
@@ -130,11 +142,11 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Women's Latest Fashion */}
+        {/* Female's Latest Fashion */}
         <section className="py-12 md:py-16 px-4 sm:px-6 lg:px-8 bg-gray-50">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-center gap-4 mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-center">Women's Latest Fashion</h2>
+              <h2 className="text-3xl md:text-4xl font-bold text-center">Female's Latest Fashion</h2>
               <div className="flex gap-2">
                 <button
                   onClick={() => setWomenCarouselIndex(Math.max(0, womenCarouselIndex - 1))}
@@ -246,112 +258,6 @@ export default function Home() {
           </div>
         </section>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <h3 className="font-bold text-gray-900 mb-4">Logo</h3>
-              <p className="text-sm text-gray-600">
-                Lorem ipsum has been the industry's standard dummy text since the 1500s.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-bold text-gray-900 mb-4">Shopping & Categories</h4>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li>
-                  <Link href="/products" className="hover:text-gray-900">
-                    Partners
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/products" className="hover:text-gray-900">
-                    Blog
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/products" className="hover:text-gray-900">
-                    Team
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/products" className="hover:text-gray-900">
-                    Careers
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold text-gray-900 mb-4">Resources</h4>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li>
-                  <Link href="/" className="hover:text-gray-900">
-                    Contact
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/" className="hover:text-gray-900">
-                    Support
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/" className="hover:text-gray-900">
-                    Docs
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/" className="hover:text-gray-900">
-                    Pricing
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold text-gray-900 mb-4">About</h4>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li>
-                  <Link href="/about" className="hover:text-gray-900">
-                    Terms
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/" className="hover:text-gray-900">
-                    Privacy
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/" className="hover:text-gray-900">
-                    License
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/" className="hover:text-gray-900">
-                    About Us
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-gray-200 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-gray-600">&copy; 2025 All rights reserved.</p>
-            <div className="flex gap-4">
-              <a href="#" className="text-gray-600 hover:text-gray-900 text-sm font-semibold">
-                f
-              </a>
-              <a href="#" className="text-gray-600 hover:text-gray-900 text-sm font-semibold">
-                in
-              </a>
-              <a href="#" className="text-gray-600 hover:text-gray-900 text-sm font-semibold">
-                tw
-              </a>
-              <a href="#" className="text-gray-600 hover:text-gray-900 text-sm font-semibold">
-                ig
-              </a>
-            </div>
-          </div>
-        </div>
-      </footer>
     </>
   )
 }

@@ -26,8 +26,8 @@ const MenuMobile: React.FC<MenuMobileProps> = ({
   const data = [
     { id: 1, name: "Home", url: "/" },
     { id: 2, name: "All Products", url: "/products" },
-    { id: 3, name: "Men", subMenu: true },
-    { id: 4, name: "Women", subMenu: true },
+    { id: 3, name: "Male", subMenu: true },
+    { id: 4, name: "Female", subMenu: true },
   ];
 
   return (
@@ -39,8 +39,8 @@ const MenuMobile: React.FC<MenuMobileProps> = ({
               <li
                 className="cursor-pointer py-4 px-5 border-b flex flex-col relative"
                 onClick={() => {
-                  if (item.name === "Men") setShowMenCat(!showMenCat);
-                  if (item.name === "Women") setShowWomenCat(!showWomenCat);
+                  if (item.name === "Male") setShowMenCat(!showMenCat);
+                  if (item.name === "Female") setShowWomenCat(!showWomenCat);
                 }}
               >
                 <div className="flex justify-between items-center">
@@ -48,8 +48,8 @@ const MenuMobile: React.FC<MenuMobileProps> = ({
                   <BsChevronDown size={14} />
                 </div>
 
-                {item.name === "Men" && showMenCat && (
-                  <ul className="bg-black/[0.05] -mx-5 mt-4 -mb-4">
+                {item.name === "Male" && showMenCat && (
+                  <ul className="bg-white/[0.05] -mx-5 mt-4 -mb-4">
                     {subMenuMenData.map((submenu) => {
                       return (
                         <Link
@@ -69,8 +69,8 @@ const MenuMobile: React.FC<MenuMobileProps> = ({
                   </ul>
                 )}
 
-                {item.name === "Women" && showWomenCat && (
-                  <ul className="bg-black/[0.05] -mx-5 mt-4 -mb-4">
+                {item.name === "Female" && showWomenCat && (
+                  <ul className="bg-white/[0.05] -mx-5 mt-4 -mb-4">
                     {subMenuWomenData.map((submenu) => {
                       return (
                         <Link

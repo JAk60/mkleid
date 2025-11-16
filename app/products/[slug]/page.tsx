@@ -1,4 +1,4 @@
-// app/products/[slug]/page.tsx
+// app/products/[slug]/page.tsx - UPDATED WITH CART
 
 'use client';
 
@@ -10,12 +10,15 @@ import { Product } from '@/lib/types';
 import { getProducts } from '@/lib/supabase';
 import { formatPrice, generateSlug, generateCategorySlug, addSlugToProduct } from '@/utils/helpers';
 import ProductCard from '@/components/products/ProductCard';
-import { ChevronLeft, Check } from 'lucide-react';
+import { ChevronLeft, Check, ShoppingCart } from 'lucide-react';
+import { useCart } from '@/context/cart-context';
+import { toast } from 'react-hot-toast';
 
 export default function ProductDetailPage() {
     const params = useParams();
     const router = useRouter();
     const slug = params.slug as string;
+    const { addItem, isInCart } = useCart();
 
     const [product, setProduct] = useState<Product | null>(null);
     const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
@@ -23,6 +26,7 @@ export default function ProductDetailPage() {
     const [selectedSize, setSelectedSize] = useState<string>('');
     const [selectedColor, setSelectedColor] = useState<string>('');
     const [selectedImage, setSelectedImage] = useState(0);
+    const [isAdding, setIsAdding] = useState(false);
 
     useEffect(() => {
         async function fetchProduct() {
@@ -61,6 +65,45 @@ export default function ProductDetailPage() {
         fetchProduct();
     }, [slug, router]);
 
+    const handleAddToCart = () => {
+        if (!product) return;
+
+        if (!selectedSize) {
+            toast.error('Please select a size');
+            return;
+        }
+
+        if (!selectedColor) {
+            toast.error('Please select a color');
+            return;
+        }
+
+        if (product.stock === 0) {
+            toast.error('This item is out of stock');
+            return;
+        }
+
+        setIsAdding(true);
+
+        // Add item to cart
+        addItem({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            image: product.image_url || '/placeholder-product.jpg',
+            size: selectedSize,
+            color: selectedColor,
+            stock: product.stock,
+        });
+
+        toast.success(`Added ${product.name} to cart!`, {
+            icon: '🛒',
+        });
+
+        // Reset adding state after animation
+        setTimeout(() => setIsAdding(false), 600);
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -78,6 +121,7 @@ export default function ProductDetailPage() {
 
     const categorySlug = generateCategorySlug(product.category);
     const isOutOfStock = product.stock === 0;
+    const inCart = isInCart(product.id, selectedSize);
 
     // Prepare images array (support for future multiple images)
     const images = product.images && product.images.length > 0
@@ -120,7 +164,7 @@ export default function ProductDetailPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
                     {/* Images */}
                     <div className="space-y-4">
-                        <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-gray-100">
+                        <div className="relative aspect-3/4 overflow-hidden rounded-lg bg-gray-100">
                             <Image
                                 src={images[selectedImage] || '/placeholder-product.jpg'}
                                 alt={product.name}
@@ -130,7 +174,7 @@ export default function ProductDetailPage() {
                                 sizes="(max-width: 1024px) 100vw, 50vw"
                             />
                             {isOutOfStock && (
-                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
                                     <span className="text-white font-semibold text-2xl">Out of Stock</span>
                                 </div>
                             )}
@@ -232,13 +276,47 @@ export default function ProductDetailPage() {
                             </div>
                         </div>
 
-                        {/* Add to Cart Button Placeholder */}
-                        <button
-                            disabled={isOutOfStock}
-                            className="w-full py-4 bg-gray-900 text-white font-semibold rounded-lg hover:bg-gray-800 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                        >
-                            {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
-                        </button>
+                        {/* Add to Cart Button */}
+                        <div className="space-y-3">
+                            <button
+                                onClick={handleAddToCart}
+                                disabled={isOutOfStock || isAdding}
+                                className={`w-full py-4 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 ${isOutOfStock
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    : inCart
+                                        ? 'bg-green-600 hover:bg-green-700 text-white'
+                                        : 'bg-gray-900 hover:bg-gray-800 text-white'
+                                    } ${isAdding ? 'scale-95' : 'scale-100'}`}
+                            >
+                                {isOutOfStock ? (
+                                    'Out of Stock'
+                                ) : isAdding ? (
+                                    <>
+                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Adding...
+                                    </>
+                                ) : inCart ? (
+                                    <>
+                                        <Check className="w-5 h-5" />
+                                        Added to Cart
+                                    </>
+                                ) : (
+                                    <>
+                                        <ShoppingCart className="w-5 h-5" />
+                                        Add to Cart
+                                    </>
+                                )}
+                            </button>
+
+                            {inCart && (
+                                <Link
+                                    href="/cart"
+                                    className="block w-full py-4 text-center border-2 border-gray-900 text-gray-900 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                                >
+                                    View Cart
+                                </Link>
+                            )}
+                        </div>
 
                         {/* Additional Info */}
                         <div className="border-t pt-6 space-y-3 text-sm text-gray-600">

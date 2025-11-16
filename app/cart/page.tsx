@@ -2,6 +2,7 @@
 
 import { Navbar } from "@/components/navbar"
 import { useCart } from "@/context/cart-context"
+import { formatPrice } from "@/utils/helpers"
 import Link from "next/link"
 
 export default function CartPage() {
@@ -10,7 +11,7 @@ export default function CartPage() {
   if (items.length === 0) {
     return (
       <>
-        <Navbar />
+
         <main className="min-h-screen bg-background">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <h1 className="text-4xl font-bold mb-8">Shopping Cart</h1>
@@ -31,7 +32,6 @@ export default function CartPage() {
 
   return (
     <>
-      <Navbar />
       <main className="min-h-screen bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <h1 className="text-4xl font-bold mb-8">Shopping Cart</h1>
@@ -49,7 +49,7 @@ export default function CartPage() {
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg">{item.name}</h3>
                     <p className="text-sm text-muted-foreground">Size: {item.size}</p>
-                    <p className="text-lg font-bold text-primary mt-2">${item.price}</p>
+                    <p className="text-lg font-bold text-primary mt-2">{formatPrice(item.price)}</p>
                   </div>
                   <div className="flex flex-col items-end gap-4">
                     <div className="flex items-center gap-2">
@@ -96,7 +96,8 @@ export default function CartPage() {
                 </div>
                 <div className="border-t border-border pt-4 flex justify-between">
                   <span className="font-bold">Total</span>
-                  <span className="text-2xl font-bold text-primary">${(total * 1.1).toFixed(2)}</span>
+                  <span className="text-2xl font-bold text-primary">{formatPrice(total * 1.1)}
+                  </span>
                 </div>
               </div>
               <Link

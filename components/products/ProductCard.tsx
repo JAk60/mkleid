@@ -14,7 +14,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const isOutOfStock = product.stock === 0;
 
   return (
-    <Link 
+    <Link
       href={`/products/${slug}`}
       className="group block"
     >
@@ -26,9 +26,9 @@ export default function ProductCard({ product }: ProductCardProps) {
           className="object-cover transition-transform duration-300 group-hover:scale-105"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
-        
+
         {isOutOfStock && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
             <span className="text-white font-semibold text-lg">Out of Stock</span>
           </div>
         )}
@@ -60,7 +60,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               <div
                 key={color}
                 className="w-4 h-4 rounded-full border border-gray-300"
-                style={{ 
+                style={{
                   backgroundColor: color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase()
                 }}
                 title={color}

@@ -13,14 +13,14 @@ interface FilterSidebarProps {
   onReset: () => void;
 }
 
-export default function FilterSidebar({ 
-  filters, 
-  onChange, 
+export default function FilterSidebar({
+  filters,
+  onChange,
   availableColors,
   priceRange,
-  onReset 
+  onReset
 }: FilterSidebarProps) {
-  
+
   const handleGenderChange = (gender: string) => {
     const newGenders = filters.gender.includes(gender)
       ? filters.gender.filter(g => g !== gender)
@@ -51,16 +51,16 @@ export default function FilterSidebar({
 
   const getAvailableCategories = () => {
     if (filters.gender.length === 0) {
-      return [...CATEGORIES.Male.map(c => ({ name: c, gender: 'Male' })), 
-              ...CATEGORIES.Female.map(c => ({ name: c, gender: 'Female' }))];
+      return [...CATEGORIES.Male?.map(c => ({ name: c, gender: 'Male' })),
+      ...CATEGORIES.Female?.map(c => ({ name: c, gender: 'Female' }))];
     }
-    
-    return filters.gender.flatMap(g => 
-      CATEGORIES[g as 'Male' | 'Female'].map(c => ({ name: c, gender: g }))
+
+    return filters.gender.flatMap(g =>
+      CATEGORIES[g as 'Male' | 'Female']?.map(c => ({ name: c, gender: g }))
     );
   };
 
-  const hasActiveFilters = 
+  const hasActiveFilters =
     filters.gender.length > 0 ||
     filters.categories.length > 0 ||
     filters.sizes.length > 0 ||
@@ -107,7 +107,7 @@ export default function FilterSidebar({
       <div className="border-b pb-6">
         <h3 className="font-medium mb-3">Category</h3>
         <div className="space-y-2 max-h-48 overflow-y-auto">
-          {getAvailableCategories().map(({ name, gender }) => {
+          {getAvailableCategories()?.map(({ name, gender }) => {
             const categoryKey = `${gender}-${name}`;
             return (
               <label key={categoryKey} className="flex items-center gap-2 cursor-pointer">
@@ -133,9 +133,9 @@ export default function FilterSidebar({
             min={priceRange[0]}
             max={priceRange[1]}
             value={filters.priceRange[1]}
-            onChange={(e) => onChange({ 
-              ...filters, 
-              priceRange: [priceRange[0], Number(e.target.value)] 
+            onChange={(e) => onChange({
+              ...filters,
+              priceRange: [priceRange[0], Number(e.target.value)]
             })}
             className="w-full"
           />
@@ -154,11 +154,10 @@ export default function FilterSidebar({
             <button
               key={size}
               onClick={() => handleSizeChange(size)}
-              className={`px-3 py-1.5 text-sm border rounded-md transition-colors ${
-                filters.sizes.includes(size)
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-900 border-gray-300 hover:border-gray-900'
-              }`}
+              className={`px-3 py-1.5 text-sm border rounded-md transition-colors ${filters.sizes.includes(size)
+                ? 'bg-gray-900 text-white border-gray-900'
+                : 'bg-white text-gray-900 border-gray-300 hover:border-gray-900'
+                }`}
             >
               {size}
             </button>
@@ -174,15 +173,14 @@ export default function FilterSidebar({
             <button
               key={color}
               onClick={() => handleColorChange(color)}
-              className={`flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md transition-colors ${
-                filters.colors.includes(color)
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-900 border-gray-300 hover:border-gray-900'
-              }`}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md transition-colors ${filters.colors.includes(color)
+                ? 'bg-gray-900 text-white border-gray-900'
+                : 'bg-white text-gray-900 border-gray-300 hover:border-gray-900'
+                }`}
             >
               <div
                 className="w-4 h-4 rounded-full border border-gray-300"
-                style={{ 
+                style={{
                   backgroundColor: color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase()
                 }}
               />

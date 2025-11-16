@@ -36,14 +36,14 @@ const HeroSection = () => {
             <div className="relative h-full w-full">
               <div className="text-center absolute w-full h-full bg-black/25 grid content-center">
                 <p className="text-2xl md:text-3xl text-white font-bold font-oswald mb-4 capitalize scaleUpCenter">
-                  Women
+                  Female
                 </p>
                 <p className="leading-relaxed text-white capitalize scaleUpCenter">
-                  Best Clothes For Women
+                  Best Clothes For Female
                 </p>
                 <div>
                   <Link
-                    href="/women/tops"
+                    href="/products/gender/Female"
                     className="mt-3 text-white inline-flex items-center capitalize border border-white px-4 md:px-6 py-1 md:py-2 transition ease-in-out hover:bg-white hover:text-black duration-300 slideInBottom"
                   >
                     shop now
@@ -51,8 +51,8 @@ const HeroSection = () => {
                 </div>
               </div>
               <Image
-                src="/women-banner.jpg"
-                alt="women banner image"
+                src="/offers-banner.png"
+                alt="Female banner image"
                 height={1080}
                 width={1920}
                 className="w-full object-cover h-full object-center inset-0"
@@ -61,14 +61,14 @@ const HeroSection = () => {
             <div className="relative h-full w-full">
               <div className="text-center absolute w-full h-full bg-black/25 grid content-center">
                 <p className="text-2xl md:text-3xl text-white font-bold font-oswald mb-4 capitalize scaleUpCenter">
-                  men
+                  Male
                 </p>
                 <p className="leading-relaxed text-white capitalize scaleUpCenter">
-                  Best Clothes For men
+                  Best Clothes For Male
                 </p>
                 <div>
                   <Link
-                    href="/men/shirt"
+                    href="/products/gender/Male"
                     className="mt-3 text-white inline-flex items-center capitalize border border-white px-4 md:px-6 py-1 md:py-2 transition ease-in-out hover:bg-white hover:text-black duration-300 slideInBottom"
                   >
                     shop now
@@ -76,8 +76,8 @@ const HeroSection = () => {
                 </div>
               </div>
               <Image
-                src="/men-banner.jpg"
-                alt="men banner image"
+                src="/offers-banner.png"
+                alt="Male banner image"
                 height={1080}
                 width={1920}
                 className="w-full object-cover h-full object-center inset-0"
