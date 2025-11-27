@@ -1,4 +1,4 @@
-// components/Header.tsx - WITH AUTH
+// components/header/index.tsx - FIXED MOBILE LOGO
 
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
@@ -23,7 +23,6 @@ const Header = () => {
   const [lastScrollY, setLastScrollY] = useState(0);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  // Get cart item count and auth
   const { itemCount } = useCart();
   const { user, isLoggedIn, logout } = useAuth();
 
@@ -65,6 +64,23 @@ const Header = () => {
     };
   }, [controlNavbar]);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.user-menu-container')) {
+        setShowUserMenu(false);
+      }
+    };
+
+    if (showUserMenu) {
+      document.addEventListener('click', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showUserMenu]);
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -85,7 +101,7 @@ const Header = () => {
             alt="Logo"
             width={320}
             height={60}
-            className="object-contain"
+            className="w-[160px] md:w-[320px] h-auto object-contain"
           />
         </Link>
 
@@ -116,15 +132,15 @@ const Header = () => {
             <div className="w-8 md:w-12 h-8 md:h-12 rounded-full flex justify-center items-center hover:bg-white/[0.05] cursor-pointer relative">
               <BsCart className="text-[15px] md:text-[20px]" />
               {itemCount > 0 && (
-                <div className="h-[14px] md:h-[18px] min-w-[14px] md:min-w-[18px] rounded-full bg-red-600 absolute top-1 left-5 md:left-7 text-white text-[10px] md:text-[12px] flex justify-center items-center px-[2px] md:px-[5px]">
+                <div className="h-3.5 md:h-[18px] min-w-3.5 md:min-w-[18px] rounded-full bg-red-600 absolute top-1 left-5 md:left-7 text-white text-[10px] md:text-[12px] flex justify-center items-center px-[2px] md:px-[5px]">
                   {itemCount}
                 </div>
               )}
             </div>
           </Link>
 
-          {/* User Icon */}
-          <div className="relative">
+          {/* User Icon with Dropdown */}
+          <div className="relative user-menu-container">
             {isLoggedIn ? (
               <>
                 <div
@@ -135,14 +151,33 @@ const Header = () => {
                 </div>
 
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-30">
-                    <div className="px-4 py-2 border-b border-gray-200">
+                  <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-30">
+                    <div className="px-4 py-3 border-b border-gray-200">
                       <p className="text-sm font-semibold truncate">{user?.name}</p>
                       <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                     </div>
+                    
+                    <Link
+                      href="/profile"
+                      onClick={() => setShowUserMenu(false)}
+                      className="block px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                    >
+                      My Profile
+                    </Link>
+                    
+                    <Link
+                      href="/orders"
+                      onClick={() => setShowUserMenu(false)}
+                      className="block px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                    >
+                      My Orders
+                    </Link>
+                    
+                    <div className="border-t border-gray-200 my-2"></div>
+                    
                     <button
                       onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                     >
                       Logout
                     </button>
@@ -151,7 +186,7 @@ const Header = () => {
               </>
             ) : (
               <Link href="/login">
-                <div className="w-8 md:w-12 h-8 md:h-12 rounded-full flex justify-center items-center hover:bg-white/[0.05] cursor-pointer">
+                <div className="w-8 md:w-12 h-8 md:h-12 rounded-full flex justify-center items-center hover:bg-white/5 cursor-pointer">
                   <IoPersonOutline className="text-[19px] md:text-[24px]" />
                 </div>
               </Link>
@@ -159,7 +194,7 @@ const Header = () => {
           </div>
 
           {/* Mobile icon */}
-          <div className="w-8 md:w-12 h-8 md:h-12 rounded-full flex md:hidden justify-center items-center hover:bg-white/[0.05] cursor-pointer relative -mr-2">
+          <div className="w-8 md:w-12 h-8 md:h-12 rounded-full flex md:hidden justify-center items-center hover:bg-white/5 cursor-pointer relative -mr-2">
             {mobileMenu ? (
               <VscChromeClose
                 className="text-[16px]"

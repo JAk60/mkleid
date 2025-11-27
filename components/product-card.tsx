@@ -27,12 +27,12 @@ export function ProductCard({ product }: { product: Product }) {
     }
 
     addItem({
-      id: product.id,
-      name: product.name,
-      price: product.price,
+      id: product?.id,
+      name: product?.name,
+      price: product?.price,
       size: selectedSize,
       quantity,
-      image: product.image,
+      image: product?.image,
     })
 
     setShowAdded(true)
@@ -44,11 +44,11 @@ export function ProductCard({ product }: { product: Product }) {
   return (
     <div className="group border border-border rounded-xl overflow-hidden hover:border-primary/50 transition-all hover:shadow-lg">
       {/* Image */}
-      <Link href={`/products/${product.id}`}>
+      <Link href={`/products/${product?.id}`}>
         <div className="relative overflow-hidden bg-muted h-64 md:h-72">
           <img
-            src={product.image || "/placeholder.svg"}
-            alt={product.name}
+            src={product?.image || "/placeholder.svg"}
+            alt={product?.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         </div>
@@ -57,23 +57,22 @@ export function ProductCard({ product }: { product: Product }) {
       {/* Content */}
       <div className="p-4 space-y-4">
         <div>
-          <Link href={`/products/${product.id}`}>
-            <h3 className="font-semibold text-lg hover:text-primary transition-colors">{product.name}</h3>
+          <Link href={`/products/${product?.id}`}>
+            <h3 className="font-semibold text-lg hover:text-primary transition-colors">{product?.name}</h3>
           </Link>
-          <p className="text-2xl font-bold text-primary mt-2">${product.price}</p>
+          <p className="text-2xl font-bold text-primary mt-2">${product?.price}</p>
         </div>
 
         {/* Size Selection */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Size</label>
           <div className="grid grid-cols-3 gap-2">
-            {product.sizes.map((size) => (
+            {product?.sizes.map((size) => (
               <button
                 key={size}
                 onClick={() => setSelectedSize(size)}
-                className={`py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedSize === size ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
-                }`}
+                className={`py-2 rounded-lg text-sm font-medium transition-colors ${selectedSize === size ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
+                  }`}
               >
                 {size}
               </button>
@@ -104,9 +103,8 @@ export function ProductCard({ product }: { product: Product }) {
         {/* Add to Cart Button */}
         <button
           onClick={handleAddToCart}
-          className={`w-full py-3 rounded-lg font-semibold transition-all ${
-            showAdded ? "bg-green-500 text-white" : "bg-primary text-primary-foreground hover:bg-primary/90"
-          }`}
+          className={`w-full py-3 rounded-lg font-semibold transition-all ${showAdded ? "bg-green-500 text-white" : "bg-primary text-primary-foreground hover:bg-primary/90"
+            }`}
         >
           {showAdded ? "✓ Added!" : "Add to Cart"}
         </button>

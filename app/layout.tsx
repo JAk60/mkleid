@@ -12,7 +12,7 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "genzquicks - Modern Clothing Brand",
+  title: "Maagnus Kleid - Modern Clothing Brand",
   description: "Trendy clothing for Gen Z",
   generator: "v0.app",
 }

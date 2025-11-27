@@ -1,4 +1,4 @@
-// app/products/[slug]/page.tsx - UPDATED WITH CART
+// app/products/[slug]/page.tsx - UPDATED WITH QUANTITY CONTROLS
 
 'use client';
 
@@ -10,7 +10,7 @@ import { Product } from '@/lib/types';
 import { getProducts } from '@/lib/supabase';
 import { formatPrice, generateSlug, generateCategorySlug, addSlugToProduct } from '@/utils/helpers';
 import ProductCard from '@/components/products/ProductCard';
-import { ChevronLeft, Check, ShoppingCart } from 'lucide-react';
+import { ChevronLeft, Check, ShoppingCart, Plus, Minus } from 'lucide-react';
 import { useCart } from '@/context/cart-context';
 import { toast } from 'react-hot-toast';
 
@@ -25,6 +25,7 @@ export default function ProductDetailPage() {
     const [loading, setLoading] = useState(true);
     const [selectedSize, setSelectedSize] = useState<string>('');
     const [selectedColor, setSelectedColor] = useState<string>('');
+    const [quantity, setQuantity] = useState<number>(1);
     const [selectedImage, setSelectedImage] = useState(0);
     const [isAdding, setIsAdding] = useState(false);
 
@@ -65,6 +66,19 @@ export default function ProductDetailPage() {
         fetchProduct();
     }, [slug, router]);
 
+    const handleQuantityChange = (change: number) => {
+        const newQuantity = quantity + change;
+        
+        if (newQuantity < 1) return;
+        
+        if (product && product.stock > 0 && newQuantity > product.stock) {
+            toast.error(`Only ${product.stock} items available in stock`);
+            return;
+        }
+        
+        setQuantity(newQuantity);
+    };
+
     const handleAddToCart = () => {
         if (!product) return;
 
@@ -83,25 +97,35 @@ export default function ProductDetailPage() {
             return;
         }
 
+        if (quantity > product.stock) {
+            toast.error(`Only ${product.stock} items available`);
+            return;
+        }
+
         setIsAdding(true);
 
-        // Add item to cart
-        addItem({
-            id: product.id,
-            name: product.name,
-            price: product.price,
-            image: product.image_url || '/placeholder-product.jpg',
-            size: selectedSize,
-            color: selectedColor,
-            stock: product.stock,
-        });
+        // Add items to cart based on quantity
+        for (let i = 0; i < quantity; i++) {
+            addItem({
+                id: product.id,
+                name: product.name,
+                price: product.price,
+                image: product.image_url || '/placeholder-product.jpg',
+                size: selectedSize,
+                color: selectedColor,
+                stock: product.stock,
+            });
+        }
 
-        toast.success(`Added ${product.name} to cart!`, {
+        toast.success(`Added ${quantity} × ${product.name} to cart!`, {
             icon: '🛒',
         });
 
-        // Reset adding state after animation
-        setTimeout(() => setIsAdding(false), 600);
+        // Reset adding state and quantity after animation
+        setTimeout(() => {
+            setIsAdding(false);
+            setQuantity(1);
+        }, 600);
     };
 
     if (loading) {
@@ -276,6 +300,39 @@ export default function ProductDetailPage() {
                             </div>
                         </div>
 
+                        {/* Quantity Selection */}
+                        <div>
+                            <label className="block text-sm font-medium mb-3">
+                                Quantity
+                            </label>
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center border border-gray-300 rounded-lg">
+                                    <button
+                                        onClick={() => handleQuantityChange(-1)}
+                                        disabled={isOutOfStock || quantity <= 1}
+                                        className="px-4 py-3 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        <Minus className="w-4 h-4" />
+                                    </button>
+                                    <span className="px-6 py-3 font-medium border-x border-gray-300 min-w-[60px] text-center">
+                                        {quantity}
+                                    </span>
+                                    <button
+                                        onClick={() => handleQuantityChange(1)}
+                                        disabled={isOutOfStock || (product.stock > 0 && quantity >= product.stock)}
+                                        className="px-4 py-3 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                    </button>
+                                </div>
+                                {product.stock > 0 && product.stock <= 10 && (
+                                    <span className="text-sm text-gray-600">
+                                        Max: {product.stock} available
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Add to Cart Button */}
                         <div className="space-y-3">
                             <button
@@ -303,7 +360,7 @@ export default function ProductDetailPage() {
                                 ) : (
                                     <>
                                         <ShoppingCart className="w-5 h-5" />
-                                        Add to Cart
+                                        Add {quantity > 1 ? `${quantity} ` : ''}to Cart
                                     </>
                                 )}
                             </button>

@@ -71,7 +71,7 @@ const Menu: React.FC<MenuProps> = ({
                 onMouseEnter={() => handleMouseEnter(item.name)}
                 onMouseLeave={() => handleMouseLeave(item.name)}
               >
-                {item.name}
+                {item.name==="Male" ? ("Men") : "Women"}
                 <BsChevronDown size={14} />
 
                 {item.name === "Male" && showMenCat && (
