@@ -70,7 +70,7 @@ export default function FilterSidebar({
     filters.priceRange[1] !== priceRange[1];
 
   return (
-    <div className="w-full space-y-6">
+    <div className="bg-[#E3D9C6] w-full space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Filters</h2>
@@ -156,7 +156,7 @@ export default function FilterSidebar({
               onClick={() => handleSizeChange(size)}
               className={`px-3 py-1.5 text-sm border rounded-md transition-colors ${filters.sizes.includes(size)
                 ? 'bg-gray-900 text-white border-gray-900'
-                : 'bg-white text-gray-900 border-gray-300 hover:border-gray-900'
+                : 'bg-[#E3D9C6] text-gray-900 border-gray-300 hover:border-gray-900'
                 }`}
             >
               {size}
@@ -175,7 +175,7 @@ export default function FilterSidebar({
               onClick={() => handleColorChange(color)}
               className={`flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md transition-colors ${filters.colors.includes(color)
                 ? 'bg-gray-900 text-white border-gray-900'
-                : 'bg-white text-gray-900 border-gray-300 hover:border-gray-900'
+                : 'bg-[#E3D9C6] text-gray-900 border-gray-300 hover:border-gray-900'
                 }`}
             >
               <div

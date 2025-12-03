@@ -30,8 +30,8 @@ function AnimateOnScroll({ children, delay = 0 }: { children: React.ReactNode, d
       animate={controls}
       variants={{
         hidden: { opacity: 0, y: 75 },
-        visible: { 
-          opacity: 1, 
+        visible: {
+          opacity: 1,
           y: 0,
           transition: {
             duration: 0.5,
@@ -59,9 +59,9 @@ export default function Home() {
 
   return (
     <>
-      <main className="min-h-screen bg-white">
+      <main className="min-h-screen bg-[#E3D9C6]">
         <Marquee messages={messages} />
-        
+
         {/* Hero Section - Animated */}
         <AnimateOnScroll delay={0}>
           <HeroSection />
@@ -84,8 +84,8 @@ export default function Home() {
 
         {/* Reviews Section - Animated */}
         <AnimateOnScroll delay={0.2}>
-          <section className="py-12 md:py-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-            <AnimatedTestimonials/>
+          <section className="bg-[#E3D9C6] py-12 md:py-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+            <AnimatedTestimonials />
           </section>
         </AnimateOnScroll>
       </main>

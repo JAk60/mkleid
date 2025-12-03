@@ -71,11 +71,11 @@ const Menu: React.FC<MenuProps> = ({
                 onMouseEnter={() => handleMouseEnter(item.name)}
                 onMouseLeave={() => handleMouseLeave(item.name)}
               >
-                {item.name==="Male" ? ("Men") : "Women"}
+                {item.name === "Male" ? ("Men") : "Women"}
                 <BsChevronDown size={14} />
 
                 {item.name === "Male" && showMenCat && (
-                  <ul className="bg-white absolute top-6 left-0 min-w-[250px] px-1 py-1 text-black shadow-lg rounded-md z-10">
+                  <ul className="bg-[#E3D9C6] absolute top-6 left-0 min-w-[250px] px-1 py-1 text-black shadow-lg rounded-md z-10">
                     {subMenuMenData.map((submenu) => {
                       return (
                         <Link
@@ -88,7 +88,7 @@ const Menu: React.FC<MenuProps> = ({
                             }
                           }}
                         >
-                          <li className="h-12 flex justify-between items-center px-3 hover:bg-white/[0.03] rounded-md">
+                          <li className="h-12 flex justify-between items-center px-3 hover:bg-[#E3D9C6]/[0.03] rounded-md">
                             {submenu.name}
                           </li>
                         </Link>
@@ -98,7 +98,7 @@ const Menu: React.FC<MenuProps> = ({
                 )}
 
                 {item.name === "Female" && showWomenCat && (
-                  <ul className="bg-white absolute top-6 left-0 min-w-[250px] px-1 py-1 text-black shadow-lg rounded-md z-10">
+                  <ul className="bg-[#E3D9C6] absolute top-6 left-0 min-w-[250px] px-1 py-1 text-black shadow-lg rounded-md z-10">
                     {subMenuWomenData.map((submenu) => {
                       return (
                         <Link
@@ -111,7 +111,7 @@ const Menu: React.FC<MenuProps> = ({
                             }
                           }}
                         >
-                          <li className="h-12 flex justify-between items-center px-3 hover:bg-white/[0.03] rounded-md">
+                          <li className="h-12 flex justify-between items-center px-3 hover:bg-[#E3D9C6]/[0.03] rounded-md">
                             {submenu.name}
                           </li>
                         </Link>

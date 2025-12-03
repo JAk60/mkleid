@@ -75,7 +75,7 @@ export default function MensLatestFashion() {
     }
 
     return (
-        <div className="w-full py-12">
+        <div className="w-full py-12 bg-[#E3D9C6]">
             <div className="max-w-7xl px-5 md:px-10 mx-auto">
                 <div className="text-center mb-12">
                     <h2 className="text-[28px] md:text-[34px] font-semibold leading-tight mb-3">

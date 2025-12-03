@@ -155,7 +155,7 @@ export default function CategoryPage() {
     : categoryDisplayName;
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#E3D9C6]">
       {/* Header */}
       <div className="border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -242,9 +242,9 @@ export default function CategoryPage() {
 
           {/* Mobile Sidebar */}
           {mobileFiltersOpen && (
-            <div className="lg:hidden fixed inset-0 z-50 bg-white/50" onClick={() => setMobileFiltersOpen(false)}>
+            <div className="lg:hidden fixed inset-0 z-50 bg-[#E3D9C6]/50" onClick={() => setMobileFiltersOpen(false)}>
               <div
-                className="absolute right-0 top-0 h-full w-80 bg-white p-6 overflow-y-auto"
+                className="absolute right-0 top-0 h-full w-80 bg-[#E3D9C6] p-6 overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between mb-6">

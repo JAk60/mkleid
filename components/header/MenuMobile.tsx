@@ -31,7 +31,7 @@ const MenuMobile: React.FC<MenuMobileProps> = ({
   ];
 
   return (
-    <ul className="flex flex-col md:hidden font-bold absolute top-[50px] left-0 w-full h-[calc(100vh-50px)] bg-white border-t text-black">
+    <ul className="flex flex-col md:hidden font-bold absolute top-[50px] left-0 w-full h-[calc(100vh-50px)] bg-[#E3D9C6] border-t text-black">
       {data.map((item) => {
         return (
           <React.Fragment key={item.id}>
@@ -49,7 +49,7 @@ const MenuMobile: React.FC<MenuMobileProps> = ({
                 </div>
 
                 {item.name === "Male" && showMenCat && (
-                  <ul className="bg-white/[0.05] -mx-5 mt-4 -mb-4">
+                  <ul className="bg-[#E3D9C6]/[0.05] -mx-5 mt-4 -mb-4">
                     {subMenuMenData.map((submenu) => {
                       return (
                         <Link
@@ -70,7 +70,7 @@ const MenuMobile: React.FC<MenuMobileProps> = ({
                 )}
 
                 {item.name === "Female" && showWomenCat && (
-                  <ul className="bg-white/[0.05] -mx-5 mt-4 -mb-4">
+                  <ul className="bg-[#E3D9C6]/[0.05] -mx-5 mt-4 -mb-4">
                     {subMenuWomenData.map((submenu) => {
                       return (
                         <Link

@@ -110,22 +110,22 @@ const Footer = () => {
             <div className="mt-8">
               <h4 className="text-yellow-400 font-bold text-sm mb-3">100% SECURE PAYMENT</h4>
               <div className="flex flex-wrap gap-2">
-                <div className="bg-white px-2 py-1 rounded">
+                <div className="bg-[#E3D9C6] px-2 py-1 rounded">
                   <span className="text-xs font-bold text-gray-700">G Pay</span>
                 </div>
-                <div className="bg-white px-2 py-1 rounded">
+                <div className="bg-[#E3D9C6] px-2 py-1 rounded">
                   <span className="text-xs font-bold text-blue-600">Paytm</span>
                 </div>
-                <div className="bg-white px-2 py-1 rounded">
+                <div className="bg-[#E3D9C6] px-2 py-1 rounded">
                   <span className="text-xs font-bold text-purple-600">PhonePe</span>
                 </div>
-                <div className="bg-white px-2 py-1 rounded">
+                <div className="bg-[#E3D9C6] px-2 py-1 rounded">
                   <span className="text-xs font-bold text-blue-800">VISA</span>
                 </div>
-                <div className="bg-white px-2 py-1 rounded">
+                <div className="bg-[#E3D9C6] px-2 py-1 rounded">
                   <span className="text-xs font-bold text-orange-500">RuPay</span>
                 </div>
-                <div className="bg-white px-2 py-1 rounded flex items-center gap-1">
+                <div className="bg-[#E3D9C6] px-2 py-1 rounded flex items-center gap-1">
                   <div className="w-4 h-4 rounded-full bg-red-500"></div>
                   <div className="w-4 h-4 rounded-full bg-orange-500 -ml-2"></div>
                 </div>

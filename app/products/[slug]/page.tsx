@@ -68,14 +68,14 @@ export default function ProductDetailPage() {
 
     const handleQuantityChange = (change: number) => {
         const newQuantity = quantity + change;
-        
+
         if (newQuantity < 1) return;
-        
+
         if (product && product.stock > 0 && newQuantity > product.stock) {
             toast.error(`Only ${product.stock} items available in stock`);
             return;
         }
-        
+
         setQuantity(newQuantity);
     };
 
@@ -153,7 +153,7 @@ export default function ProductDetailPage() {
         : [product.image_url];
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-[#E3D9C6]">
             {/* Header */}
             <div className="border-b">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -198,7 +198,7 @@ export default function ProductDetailPage() {
                                 sizes="(max-width: 1024px) 100vw, 50vw"
                             />
                             {isOutOfStock && (
-                                <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
+                                <div className="absolute inset-0 bg-[#E3D9C6]/50 flex items-center justify-center">
                                     <span className="text-white font-semibold text-2xl">Out of Stock</span>
                                 </div>
                             )}
@@ -263,7 +263,7 @@ export default function ProductDetailPage() {
                                         disabled={isOutOfStock}
                                         className={`px-6 py-3 border rounded-lg font-medium transition-all ${selectedSize === size
                                             ? 'bg-gray-900 text-white border-gray-900'
-                                            : 'bg-white text-gray-900 border-gray-300 hover:border-gray-900'
+                                            : 'bg-[#E3D9C6] text-gray-900 border-gray-300 hover:border-gray-900'
                                             } disabled:opacity-50 disabled:cursor-not-allowed`}
                                     >
                                         {size}

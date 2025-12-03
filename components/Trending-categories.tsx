@@ -24,7 +24,7 @@ export default function TrendingCategories() {
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 4)
         .map(addSlugToProduct)
-      
+
       setProducts(trendingProducts)
     } catch (error) {
       console.error("Failed to load trending products:", error)
@@ -35,7 +35,7 @@ export default function TrendingCategories() {
 
   if (loading) {
     return (
-      <section className="py-20 md:py-2 px-4 sm:px-6 lg:px-8 bg-white">
+      <section className="py-20 md:py-2 px-4 sm:px-6 lg:px-8 bg-[#E3D9C6]">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-16 md:mb-20">
             <div className="h-6 bg-gray-200 rounded w-32 animate-pulse"></div>
@@ -60,7 +60,7 @@ export default function TrendingCategories() {
   }
 
   return (
-    <section className="py-20 md:py-32 px-4 sm:px-6 lg:px-8 bg-white">
+    <section className="bg-[#E3D9C6] py-20 md:py-32 px-4 sm:px-6 lg:px-8 ">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-16 md:mb-20">
@@ -87,13 +87,13 @@ export default function TrendingCategories() {
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors duration-300" />
-                  
+
                   {product.stock === 0 && (
-                    <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-[#E3D9C6]/80 flex items-center justify-center">
                       <span className="text-gray-900 font-bold text-lg">OUT OF STOCK</span>
                     </div>
                   )}
-                  
+
                   {product.stock > 0 && product.stock <= 5 && (
                     <div className="absolute top-4 right-4 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded">
                       ONLY {product.stock} LEFT
@@ -108,13 +108,13 @@ export default function TrendingCategories() {
                   <p className="text-xs md:text-sm text-gray-600 font-semibold">
                     {formatPrice(product.price)}
                   </p>
-                  
+
                   {/* Sizes */}
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <span>Sizes:</span>
                     <span className="font-medium">{product.sizes.join(', ')}</span>
                   </div>
-                  
+
                   {/* Colors */}
                   <div className="flex items-center gap-2">
                     {product.colors.slice(0, 4).map((color, idx) => (

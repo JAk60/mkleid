@@ -60,7 +60,7 @@ export default function WomensLatestFashion() {
 
   if (products.length === 0) {
     return (
-      <div className="w-full py-12 bg-gray-50">
+      <div className="bg-[#E3D9C6] w-full py-12 ">
         <div className="max-w-7xl px-5 md:px-10 mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-[28px] md:text-[34px] font-semibold leading-tight">
@@ -76,7 +76,7 @@ export default function WomensLatestFashion() {
   }
 
   return (
-    <div className="w-full py-12 bg-gray-50">
+    <div className="bg-[#E3D9C6] w-full py-12">
       <div className="max-w-7xl px-5 md:px-10 mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-[28px] md:text-[34px] font-semibold leading-tight mb-3">

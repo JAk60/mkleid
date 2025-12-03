@@ -57,7 +57,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     }
 
     toast.success(`Added ${quantity} item(s) to cart!`);
-    
+
     setTimeout(() => {
       setIsAdding(false);
       setQuantity(1);
@@ -134,11 +134,10 @@ export default function ProductCard({ product }: ProductCardProps) {
                 e.stopPropagation();
                 setSelectedSize(size);
               }}
-              className={`px-3 py-1.5 text-sm font-medium border-2 rounded-lg transition-all ${
-                selectedSize === size
+              className={`px-3 py-1.5 text-sm font-medium border-2 rounded-lg transition-all ${selectedSize === size
                   ? 'bg-black text-white border-black'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-black'
-              }`}
+                  : 'bg-[#E3D9C6] text-gray-700 border-gray-300 hover:border-black'
+                }`}
             >
               {size}
             </button>
@@ -160,9 +159,9 @@ export default function ProductCard({ product }: ProductCardProps) {
             >
               −
             </button>
-            
+
             <span className="font-semibold text-lg">{quantity}</span>
-            
+
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -182,11 +181,10 @@ export default function ProductCard({ product }: ProductCardProps) {
           <button
             onClick={handleAddToCart}
             disabled={isAdding}
-            className={`w-full py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
-              isAdding
+            className={`w-full py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${isAdding
                 ? 'bg-green-600 text-white'
                 : 'bg-black text-white hover:bg-gray-800'
-            }`}
+              }`}
           >
             <ShoppingCart className="w-5 h-5" />
             {isAdding ? 'Added!' : 'Add to Cart'}
