@@ -1,4 +1,4 @@
-// lib/admin-auth.ts
+// lib/admin-auth.ts - UPDATED WITH DEBUGGING
 
 import { supabase } from './supabase';
 import bcrypt from 'bcryptjs';
@@ -33,84 +33,138 @@ export async function adminLogin(email: string, password: string): Promise<{
   token: string;
   expiresAt: Date;
 }> {
-  // 1. Find admin by email
-  const { data: admin, error: adminError } = await supabase
-    .from('admin_users')
-    .select('*')
-    .eq('email', email)
-    .eq('is_active', true)
-    .single();
+  console.log('🔍 Admin Login Attempt:', { email });
 
-  if (adminError || !admin) {
-    throw new Error('Invalid credentials');
-  }
+  try {
+    // 1. Find admin by email
+    const { data: admin, error: adminError } = await supabase
+      .from('admin_users')
+      .select('*')
+      .eq('email', email)
+      .eq('is_active', true)
+      .single();
 
-  // 2. Verify password
-  const isValidPassword = await bcrypt.compare(password, admin.password_hash);
-  
-  if (!isValidPassword) {
-    throw new Error('Invalid credentials');
-  }
-
-  // 3. Generate session token
-  const token = generateAdminToken();
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-  // 4. Create session
-  const { error: sessionError } = await supabase
-    .from('admin_sessions')
-    .insert({
-      admin_id: admin.id,
-      token,
-      expires_at: expiresAt.toISOString(),
+    console.log('📊 Database Query Result:', { 
+      found: !!admin, 
+      error: adminError?.message,
+      adminId: admin?.id 
     });
 
-  if (sessionError) {
-    throw new Error('Failed to create session');
+    if (adminError || !admin) {
+      console.error('❌ Admin not found:', adminError);
+      throw new Error('Invalid credentials - Admin not found');
+    }
+
+    console.log('🔐 Password Hash from DB:', admin.password_hash?.substring(0, 20) + '...');
+    console.log('🔑 Password provided:', password);
+
+    // 2. Verify password
+    let isValidPassword = false;
+    
+    try {
+      isValidPassword = await bcrypt.compare(password, admin.password_hash);
+      console.log('✅ Password verification result:', isValidPassword);
+    } catch (bcryptError: any) {
+      console.error('❌ Bcrypt error:', bcryptError.message);
+      throw new Error('Password verification failed: ' + bcryptError.message);
+    }
+    
+    if (!isValidPassword) {
+      console.error('❌ Invalid password');
+      throw new Error('Invalid credentials - Wrong password');
+    }
+
+    console.log('✅ Password verified successfully');
+
+    // 3. Generate session token
+    const token = generateAdminToken();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    console.log('🎫 Generated token:', token.substring(0, 20) + '...');
+
+    // 4. Create session
+    const { error: sessionError } = await supabase
+      .from('admin_sessions')
+      .insert({
+        admin_id: admin.id,
+        token,
+        expires_at: expiresAt.toISOString(),
+      });
+
+    if (sessionError) {
+      console.error('❌ Session creation error:', sessionError);
+      throw new Error('Failed to create session: ' + sessionError.message);
+    }
+
+    console.log('✅ Session created successfully');
+
+    // 5. Update last login
+    try {
+      await supabase.rpc('update_admin_last_login', { admin_uuid: admin.id });
+      console.log('✅ Last login updated');
+    } catch (updateError: any) {
+      console.warn('⚠️ Could not update last login:', updateError.message);
+      // Don't fail login if this fails
+    }
+
+    // 6. Log activity
+    try {
+      await logAdminActivity(admin.id, admin.email, 'LOGIN');
+      console.log('✅ Activity logged');
+    } catch (logError: any) {
+      console.warn('⚠️ Could not log activity:', logError.message);
+      // Don't fail login if this fails
+    }
+
+    // 7. Remove password hash from response
+    const { password_hash, ...adminWithoutPassword } = admin;
+
+    console.log('🎉 Login successful!');
+
+    return {
+      admin: adminWithoutPassword as AdminUser,
+      token,
+      expiresAt,
+    };
+  } catch (error: any) {
+    console.error('💥 Admin login failed:', error);
+    throw error;
   }
-
-  // 5. Update last login
-  await supabase.rpc('update_admin_last_login', { admin_uuid: admin.id });
-
-  // 6. Log activity
-  await logAdminActivity(admin.id, admin.email, 'LOGIN');
-
-  // 7. Remove password hash from response
-  const { password_hash, ...adminWithoutPassword } = admin;
-
-  return {
-    admin: adminWithoutPassword as AdminUser,
-    token,
-    expiresAt,
-  };
 }
 
 /**
  * Verify admin session token
  */
 export async function verifyAdminToken(token: string): Promise<AdminUser | null> {
-  // 1. Find valid session
-  const { data: session, error: sessionError } = await supabase
-    .from('admin_sessions')
-    .select('*, admin_users(*)')
-    .eq('token', token)
-    .gt('expires_at', new Date().toISOString())
-    .single();
+  try {
+    // 1. Find valid session
+    const { data: session, error: sessionError } = await supabase
+      .from('admin_sessions')
+      .select('*, admin_users(*)')
+      .eq('token', token)
+      .gt('expires_at', new Date().toISOString())
+      .single();
 
-  if (sessionError || !session) {
+    if (sessionError || !session) {
+      console.warn('⚠️ Session not found or expired');
+      return null;
+    }
+
+    // 2. Check if admin is still active
+    const admin = session.admin_users;
+    if (!admin || !admin.is_active) {
+      console.warn('⚠️ Admin inactive');
+      return null;
+    }
+
+    // 3. Remove password hash
+    const { password_hash, ...adminWithoutPassword } = admin;
+
+    return adminWithoutPassword as AdminUser;
+  } catch (error: any) {
+    console.error('❌ Token verification error:', error);
     return null;
   }
-
-  // 2. Check if admin is still active
-  const admin = session.admin_users;
-  if (!admin || !admin.is_active) {
-    return null;
-  }
-
-  // 3. Remove password hash
-  const { password_hash, ...adminWithoutPassword } = admin;
-
-  return adminWithoutPassword as AdminUser;
 }
 
 /**
@@ -180,103 +234,6 @@ export async function createAdminUser(data: {
   return adminWithoutPassword as AdminUser;
 }
 
-/**
- * Update admin password
- */
-export async function updateAdminPassword(
-  adminId: string,
-  currentPassword: string,
-  newPassword: string
-): Promise<void> {
-  // Get admin
-  const { data: admin, error } = await supabase
-    .from('admin_users')
-    .select('*')
-    .eq('id', adminId)
-    .single();
-
-  if (error || !admin) {
-    throw new Error('Admin not found');
-  }
-
-  // Verify current password
-  const isValidPassword = await bcrypt.compare(currentPassword, admin.password_hash);
-  if (!isValidPassword) {
-    throw new Error('Invalid current password');
-  }
-
-  // Hash new password
-  const newPasswordHash = await bcrypt.hash(newPassword, 10);
-
-  // Update password
-  const { error: updateError } = await supabase
-    .from('admin_users')
-    .update({
-      password_hash: newPasswordHash,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', adminId);
-
-  if (updateError) {
-    throw new Error('Failed to update password');
-  }
-
-  // Log activity
-  await logAdminActivity(adminId, admin.email, 'PASSWORD_CHANGE');
-
-  // Invalidate all sessions for this admin
-  await supabase
-    .from('admin_sessions')
-    .delete()
-    .eq('admin_id', adminId);
-}
-
-/**
- * Deactivate admin user
- */
-export async function deactivateAdmin(
-  adminId: string,
-  deactivatedBy: AdminUser
-): Promise<void> {
-  // Only super_admins can deactivate
-  if (deactivatedBy.role !== 'super_admin') {
-    throw new Error('Insufficient permissions');
-  }
-
-  // Cannot deactivate yourself
-  if (adminId === deactivatedBy.id) {
-    throw new Error('Cannot deactivate yourself');
-  }
-
-  const { data: admin } = await supabase
-    .from('admin_users')
-    .select('email')
-    .eq('id', adminId)
-    .single();
-
-  // Deactivate
-  await supabase
-    .from('admin_users')
-    .update({ is_active: false, updated_at: new Date().toISOString() })
-    .eq('id', adminId);
-
-  // Delete all sessions
-  await supabase
-    .from('admin_sessions')
-    .delete()
-    .eq('admin_id', adminId);
-
-  // Log activity
-  await logAdminActivity(
-    deactivatedBy.id,
-    deactivatedBy.email,
-    'DEACTIVATE_ADMIN',
-    'admin_user',
-    adminId,
-    { deactivated_email: admin?.email }
-  );
-}
-
 // ========================================
 // ADMIN ACTIVITY LOGGING
 // ========================================
@@ -289,50 +246,19 @@ export async function logAdminActivity(
   resourceId?: string,
   details?: any
 ): Promise<void> {
-  await supabase.rpc('log_admin_activity', {
-    p_admin_id: adminId,
-    p_admin_email: adminEmail,
-    p_action: action,
-    p_resource_type: resourceType || null,
-    p_resource_id: resourceId || null,
-    p_details: details ? JSON.stringify(details) : null,
-  });
-}
-
-/**
- * Get admin activity logs
- */
-export async function getAdminActivityLogs(options?: {
-  adminId?: string;
-  action?: string;
-  limit?: number;
-  offset?: number;
-}) {
-  let query = supabase
-    .from('admin_activity_logs')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (options?.adminId) {
-    query = query.eq('admin_id', options.adminId);
+  try {
+    await supabase.rpc('log_admin_activity', {
+      p_admin_id: adminId,
+      p_admin_email: adminEmail,
+      p_action: action,
+      p_resource_type: resourceType || null,
+      p_resource_id: resourceId || null,
+      p_details: details ? JSON.stringify(details) : null,
+    });
+  } catch (error: any) {
+    console.error('Failed to log activity:', error);
+    // Don't throw - logging failure shouldn't break the app
   }
-
-  if (options?.action) {
-    query = query.eq('action', options.action);
-  }
-
-  if (options?.limit) {
-    query = query.limit(options.limit);
-  }
-
-  if (options?.offset) {
-    query = query.range(options.offset, options.offset + (options.limit || 50) - 1);
-  }
-
-  const { data, error } = await query;
-
-  if (error) throw error;
-  return data;
 }
 
 // ========================================
@@ -348,4 +274,34 @@ function generateAdminToken(): string {
  */
 export async function cleanupExpiredSessions(): Promise<void> {
   await supabase.rpc('cleanup_expired_admin_sessions');
+}
+
+// ========================================
+// DEBUG HELPER: Test password hash
+// ========================================
+
+export async function testPasswordHash(email: string, password: string): Promise<void> {
+  console.log('🧪 Testing password hash for:', email);
+  
+  const { data: admin } = await supabase
+    .from('admin_users')
+    .select('password_hash')
+    .eq('email', email)
+    .single();
+    
+  if (!admin) {
+    console.error('❌ Admin not found');
+    return;
+  }
+  
+  console.log('Hash from DB:', admin.password_hash);
+  console.log('Password:', password);
+  
+  const result = await bcrypt.compare(password, admin.password_hash);
+  console.log('Match result:', result);
+  
+  // Also try generating a new hash
+  const newHash = await bcrypt.hash(password, 10);
+  console.log('New hash generated:', newHash);
+  console.log('New hash matches:', await bcrypt.compare(password, newHash));
 }
