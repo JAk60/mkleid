@@ -1,9 +1,11 @@
+// app/login/page.tsx
 "use client"
 
 import type React from "react"
 import { useAuth } from "@/context/auth-context"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { adminLogin } from "@/lib/admin-auth"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -21,9 +23,34 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
+      // Check if it's an admin email
+      const isAdminEmail = email.toLowerCase().includes("@maagnuskleid.com") || 
+                          email.toLowerCase() === "admin@maagnuskleid.com"
+
+      if (isAdminEmail) {
+        // Try admin login
+        try {
+          const { admin, token, expiresAt } = await adminLogin(email, password)
+          
+          // Store admin session
+          localStorage.setItem("admin_token", token)
+          localStorage.setItem("admin_user", JSON.stringify(admin))
+          localStorage.setItem("admin_expires", expiresAt.toISOString())
+          
+          // Redirect to admin dashboard
+          router.push("/admin/dashboard")
+          return
+        } catch (adminError: any) {
+          // If admin login fails, show error
+          setError("Invalid admin credentials")
+          setIsLoading(false)
+          return
+        }
+      }
+
+      // Regular user login/signup
       if (isSignup) {
         await signup(email, password, name)
-        // Show success message if email confirmation is required
         alert("Account created! Please check your email to confirm.")
       } else {
         await login(email, password)
@@ -42,7 +69,9 @@ export default function LoginPage() {
         <div className="border border-border rounded-xl p-8 space-y-6">
           <div className="text-center">
             <h1 className="text-3xl font-bold mb-2">{isSignup ? "Create Account" : "Welcome Back"}</h1>
-            <p className="text-muted-foreground">{isSignup ? "Join genzquicks today" : "Sign in to your account"}</p>
+            <p className="text-muted-foreground">
+              {isSignup ? "Join genzquicks today" : "Sign in to your account"}
+            </p>
           </div>
 
           {error && (
@@ -76,6 +105,11 @@ export default function LoginPage() {
                 className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background"
                 required
               />
+              {email.toLowerCase().includes("@maagnuskleid.com") && (
+                <p className="text-xs text-primary mt-1 flex items-center gap-1">
+                  🔒 Admin account detected
+                </p>
+              )}
             </div>
 
             <div>
@@ -116,6 +150,13 @@ export default function LoginPage() {
               >
                 {isSignup ? "Sign In" : "Sign Up"}
               </button>
+            </p>
+          </div>
+
+          {/* Admin Login Info */}
+          <div className="pt-4 border-t border-border">
+            <p className="text-xs text-center text-muted-foreground">
+              💡 Tip: Use your <span className="font-semibold">@maagnuskleid.com</span> email to access admin panel
             </p>
           </div>
         </div>
