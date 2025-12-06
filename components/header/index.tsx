@@ -95,7 +95,7 @@ const Header = () => {
       className={`w-full h-[50px] md:h-20 bg-[#E3D9C6] flex items-center justify-between z-20 sticky top-0 transition-transform duration-300 ${show}`}
     >
       <Wrapper className="h-[60px] flex justify-between items-center">
-        <Link href="/mk.png" className="inline-block">
+        <Link href="/" className="inline-block">
           <img
             src="/mk.png"
             alt="MAAGNUS KLEID"

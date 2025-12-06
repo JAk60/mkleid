@@ -21,6 +21,7 @@ import ProductsManagement from '../ProductsManagement';
 import OrdersManagement from '../OrdersManagement';
 import CustomersManagement from '../CustomersManagement';
 import AnalyticsPage from '../AnalyticsPage';
+import CategoryManagement from '../CategoriesManagement';
 export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeMenu, setActiveMenu] = useState('dashboard');
@@ -32,6 +33,7 @@ export default function AdminDashboard() {
     { id: 'products', label: 'Products', icon: Package },
     { id: 'orders', label: 'Orders', icon: ShoppingCart },
     { id: 'customers', label: 'Customers', icon: Users },
+    { id: 'categories', label: 'Categories', icon: BarChart3 },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -46,6 +48,8 @@ export default function AdminDashboard() {
         return <OrdersManagement />;
       case 'customers':
         return <CustomersManagement />;
+      case 'categories':
+        return <CategoryManagement />;
       case 'analytics':
         return <AnalyticsPage />;
       case 'settings':
