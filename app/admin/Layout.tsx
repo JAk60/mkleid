@@ -1,42 +1,39 @@
-// app/layout.tsx or app/admin/layout.tsx
-// Add this import at the top
+// app/admin/layout.tsx
 import { Toaster } from 'react-hot-toast';
 
-// Then in your layout component, add the Toaster:
-export default function RootLayout({
+
+export default function AdminLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
-        {children}
-        <Toaster
-          position="top-right"
-          toastOptions={{
+    <>
+      {children}
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
             duration: 3000,
-            style: {
-              background: '#363636',
-              color: '#fff',
+            iconTheme: {
+              primary: '#4ade80',
+              secondary: '#fff',
             },
-            success: {
-              duration: 3000,
-              iconTheme: {
-                primary: '#4ade80',
-                secondary: '#fff',
-              },
+          },
+          error: {
+            duration: 4000,
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
             },
-            error: {
-              duration: 4000,
-              iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
-              },
-            },
-          }}
-        />
-      </body>
-    </html>
+          },
+        }}
+      />
+    </>
   );
 }

@@ -95,9 +95,16 @@ const Header = () => {
       className={`w-full h-[50px] md:h-20 bg-[#E3D9C6] flex items-center justify-between z-20 sticky top-0 transition-transform duration-300 ${show}`}
     >
       <Wrapper className="h-[60px] flex justify-between items-center">
-<Link href="/" className="font-(family-name:--font-paragraph) text-4xl md:text-6xl text-[#2C1810]">
-          MAAGNUS KLEID
+        <Link href="/mk.png" className="inline-block">
+          <img
+            src="/mk.png"
+            alt="MAAGNUS KLEID"
+            height={"300erm"}
+            width={"300rem"}
+            className="mt-6 font-(family-name:--font-paragraph) text-4xl md:text-6xl text-[#2C1810]"
+          />
         </Link>
+
 
         <Menu
           showMenCat={showMenCat}

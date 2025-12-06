@@ -1,7 +1,8 @@
+// app/admin/CustomersManagement.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Mail, Phone, Calendar, ShoppingBag, Eye, Ban } from 'lucide-react';
+import { Search, Mail, Phone, Calendar, ShoppingBag, Eye } from 'lucide-react';
 
 interface Customer {
   id: string;
@@ -15,12 +16,13 @@ interface Customer {
 }
 
 export default function CustomersManagement() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]); // Always initialize as array
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [customerOrders, setCustomerOrders] = useState<any[]>([]);
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
     fetchCustomers();
@@ -29,11 +31,29 @@ export default function CustomersManagement() {
   const fetchCustomers = async () => {
     try {
       setLoading(true);
+      setError('');
       const response = await fetch('/api/admin/customers');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
-      setCustomers(data || []);
-    } catch (error) {
+      
+      // Ensure data is an array
+      if (Array.isArray(data)) {
+        setCustomers(data);
+      } else if (data.customers && Array.isArray(data.customers)) {
+        setCustomers(data.customers);
+      } else {
+        console.error('Invalid customers data:', data);
+        setCustomers([]);
+        setError('Invalid data format received');
+      }
+    } catch (error: any) {
       console.error('Failed to fetch customers:', error);
+      setCustomers([]);
+      setError(error.message || 'Failed to load customers');
     } finally {
       setLoading(false);
     }
@@ -42,10 +62,16 @@ export default function CustomersManagement() {
   const fetchCustomerOrders = async (userId: string) => {
     try {
       const response = await fetch(`/api/admin/customers/${userId}/orders`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
-      setCustomerOrders(data || []);
+      setCustomerOrders(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch customer orders:', error);
+      setCustomerOrders([]);
     }
   };
 
@@ -55,10 +81,13 @@ export default function CustomersManagement() {
     await fetchCustomerOrders(customer.id);
   };
 
-  const filteredCustomers = customers.filter(customer =>
-    customer.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Safe filter - only filter if customers is an array
+  const filteredCustomers = Array.isArray(customers) 
+    ? customers.filter(customer =>
+        customer.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        customer.name?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
 
   return (
     <div className="space-y-6">
@@ -70,9 +99,23 @@ export default function CustomersManagement() {
         </div>
       </div>
 
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <p className="font-semibold">Error loading customers</p>
+          <p className="text-sm">{error}</p>
+          <button 
+            onClick={fetchCustomers}
+            className="mt-2 text-sm underline hover:no-underline"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
         <input
           type="text"
           placeholder="Search customers by name or email..."
@@ -131,13 +174,22 @@ export default function CustomersManagement() {
               {loading ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                    Loading customers...
+                    <div className="flex items-center justify-center">
+                      <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mr-3" />
+                      Loading customers...
+                    </div>
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-red-500">
+                    Error loading customers. Please try again.
                   </td>
                 </tr>
               ) : filteredCustomers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                    No customers found
+                    {searchQuery ? 'No customers found matching your search' : 'No customers found'}
                   </td>
                 </tr>
               ) : (
@@ -145,7 +197,7 @@ export default function CustomersManagement() {
                   <tr key={customer.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="w-10 h-10 bg-linear-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
                           {customer.name?.charAt(0) || customer.email?.charAt(0) || '?'}
                         </div>
                         <div className="ml-3">
@@ -201,13 +253,13 @@ export default function CustomersManagement() {
 
       {/* Customer Details Modal */}
       {showDetailsModal && selectedCustomer && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-2xl font-bold text-gray-900">Customer Details</h2>
               <button
                 onClick={() => setShowDetailsModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 text-3xl leading-none"
               >
                 ×
               </button>
