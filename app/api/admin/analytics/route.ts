@@ -1,7 +1,8 @@
-// app/api/admin/analytics/route.ts
+// app/api/admin/analytics/route.ts - FIXED VERSION
 
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin'; // Import admin client
 
 export async function GET(request: Request) {
   try {
@@ -33,9 +34,19 @@ export async function GET(request: Request) {
 
     const totalRevenue = paidOrders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
 
-    // Get total customers
-    const { data: { users } } = await supabase.auth.admin.listUsers();
-    const totalCustomers = users?.length || 0;
+    // ✅ FIX: Use supabaseAdmin to get total customers
+    let totalCustomers = 0;
+    try {
+      const { data: { users }, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
+      totalCustomers = users?.length || 0;
+      console.log(`✅ Found ${totalCustomers} customers`);
+      
+      if (usersError) {
+        console.error('❌ Error fetching users:', usersError);
+      }
+    } catch (err) {
+      console.error('❌ Error fetching users:', err);
+    }
 
     // Calculate growth (compare with previous period)
     const previousStartDate = new Date(startDate);

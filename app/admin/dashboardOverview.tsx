@@ -1,16 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
-  Package, 
-  ShoppingCart, 
-  Users, 
+import {
+  Package,
+  ShoppingCart,
+  Users,
   IndianRupee,
   TrendingUp,
   AlertTriangle,
   Clock,
   CheckCircle
 } from 'lucide-react';
+import Link from 'next/link';
 
 interface Stats {
   totalProducts: number;
@@ -225,27 +226,7 @@ export default function DashboardOverview() {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="bg-linear-to-r from-blue-600 to-purple-600 rounded-xl shadow-lg p-6 text-white">
-        <h2 className="text-2xl font-bold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg p-4 text-left transition-colors">
-            <Package className="w-6 h-6 mb-2" />
-            <p className="font-semibold">Add New Product</p>
-            <p className="text-sm text-white/80">Create a new product listing</p>
-          </button>
-          <button className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg p-4 text-left transition-colors">
-            <ShoppingCart className="w-6 h-6 mb-2" />
-            <p className="font-semibold">View All Orders</p>
-            <p className="text-sm text-white/80">Manage customer orders</p>
-          </button>
-          <button className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg p-4 text-left transition-colors">
-            <TrendingUp className="w-6 h-6 mb-2" />
-            <p className="font-semibold">View Analytics</p>
-            <p className="text-sm text-white/80">Check store performance</p>
-          </button>
-        </div>
-      </div>
+   
     </div>
   );
 }

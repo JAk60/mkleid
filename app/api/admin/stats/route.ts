@@ -1,7 +1,8 @@
-// app/api/admin/stats/route.ts
+// app/api/admin/stats/route.ts - FIXED VERSION
 
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin'; // Import admin client
 
 export async function GET() {
   try {
@@ -82,15 +83,18 @@ export async function GET() {
       console.error('Recent orders error:', err);
     }
 
-    // Get users count
+    // ✅ FIX: Use supabaseAdmin to get users count
     let totalCustomers = 0;
     try {
-      const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
+      const { data: { users }, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
       if (!usersError && users) {
         totalCustomers = users.length;
+        console.log(`✅ Found ${totalCustomers} customers`);
+      } else {
+        console.error('❌ Users count error:', usersError);
       }
     } catch (err) {
-      console.error('Users count error:', err);
+      console.error('❌ Users count error:', err);
     }
 
     const stats = {

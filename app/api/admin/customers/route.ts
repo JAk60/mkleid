@@ -1,20 +1,32 @@
 // app/api/admin/customers/route.ts
-// FIXED: Uses service role key to access auth users
+// FIXED: Proper error handling and admin client usage
 
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { supabaseAdmin } from '@/lib/supabase-admin'; // Import admin client
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET() {
   try {
     console.log('👥 Admin Customers API called');
+
+    // Check if service role key is configured
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('❌ SUPABASE_SERVICE_ROLE_KEY not configured');
+      return NextResponse.json({
+        error: 'Admin credentials not configured. Please add SUPABASE_SERVICE_ROLE_KEY to your environment variables.',
+        customers: []
+      }, { status: 500 });
+    }
 
     // Use admin client to list users (requires service role key)
     const { data, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
 
     if (usersError) {
       console.error('❌ Error fetching users:', usersError);
-      throw new Error(`Failed to fetch users: ${usersError.message}`);
+      return NextResponse.json({
+        error: `Failed to fetch users: ${usersError.message}`,
+        customers: []
+      }, { status: 500 });
     }
 
     const users = data?.users || [];
@@ -95,12 +107,19 @@ export async function GET() {
   } catch (error: any) {
     console.error('❌ Admin Customers API Error:', error);
     
-    return NextResponse.json(
-      {
-        error: error.message || 'Failed to fetch customers',
-        customers: []
-      },
-      { status: 500 }
-    );
+    // Return a more helpful error message
+    let errorMessage = 'Failed to fetch customers';
+    
+    if (error.message?.includes('service_role')) {
+      errorMessage = 'Admin access requires SUPABASE_SERVICE_ROLE_KEY. Please add it to your .env.local file.';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    return NextResponse.json({
+      error: errorMessage,
+      customers: [],
+      hint: 'Make sure SUPABASE_SERVICE_ROLE_KEY is set in your .env.local file'
+    }, { status: 500 });
   }
 }

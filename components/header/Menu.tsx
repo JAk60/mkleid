@@ -23,7 +23,7 @@ const Menu: React.FC<MenuProps> = ({
 }) => {
   const data = [
     { id: 1, name: "Home", url: "/" },
-    { id: 2, name: "All Products", url: "/products" },
+    // { id: 2, name: "All Products", url: "/products" },
     { id: 3, name: "Male", subMenu: true },
     { id: 4, name: "Female", subMenu: true },
   ];

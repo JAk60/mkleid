@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, X, Save, Search, Upload } from "lucide-react";
+import { Plus, Edit, Trash2, X, Save, Search, Upload, Image as ImageIcon } from "lucide-react";
 
 interface Product {
   id?: number;
@@ -35,9 +35,7 @@ export default function ProductsManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [filterGender, setFilterGender] = useState<"all" | "Male" | "Female">(
-    "all"
-  );
+  const [filterGender, setFilterGender] = useState<"all" | "Male" | "Female">("all");
   const [filterCategory, setFilterCategory] = useState("all");
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -68,13 +66,21 @@ export default function ProductsManagement() {
   const loadCloudinaryScript = () => {
     if ((window as any).cloudinary) {
       setCloudinaryLoaded(true);
+      console.log("✅ Cloudinary already loaded");
       return;
     }
 
     const script = document.createElement("script");
     script.src = "https://upload-widget.cloudinary.com/global/all.js";
     script.async = true;
-    script.onload = () => setCloudinaryLoaded(true);
+    script.onload = () => {
+      setCloudinaryLoaded(true);
+      console.log("✅ Cloudinary widget loaded successfully");
+    };
+    script.onerror = () => {
+      console.error("❌ Failed to load Cloudinary widget");
+      alert("Failed to load Cloudinary. Please refresh the page.");
+    };
     document.body.appendChild(script);
   };
 
@@ -85,6 +91,7 @@ export default function ProductsManagement() {
       const data = await response.json();
       setProducts(data || []);
     } catch (error) {
+      console.error("Failed to load products:", error);
       alert("Failed to load products");
     } finally {
       setLoading(false);
@@ -125,17 +132,33 @@ export default function ProductsManagement() {
       return;
     }
 
+    // Check if env variables are set
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+    if (!cloudName || !uploadPreset) {
+      alert("Cloudinary is not configured. Please add NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET to your .env.local file");
+      console.error("Missing Cloudinary config:", { cloudName, uploadPreset });
+      return;
+    }
+
+    console.log("🚀 Opening Cloudinary widget with config:", { cloudName, uploadPreset });
     setUploading(true);
 
     const widget = (window as any).cloudinary.createUploadWidget(
       {
-        cloudName: "demo", // Replace with your cloud name
-        uploadPreset: "ml_default", // Replace with your upload preset
+        cloudName: cloudName,
+        uploadPreset: uploadPreset,
         sources: ["local", "url", "camera"],
         folder: "products",
         multiple: false,
-        maxImageFileSize: 2000000,
+        maxFiles: 1,
+        maxFileSize: 2000000, // 2MB
         clientAllowedFormats: ["png", "jpg", "jpeg", "webp"],
+        resourceType: "image",
+        cropping: true,
+        croppingAspectRatio: 1,
+        showSkipCropButton: false,
         styles: {
           palette: {
             window: "#FFFFFF",
@@ -151,24 +174,44 @@ export default function ProductsManagement() {
             inProgress: "#2563EB",
             complete: "#10B981",
             sourceBg: "#F3F4F6"
+          },
+          fonts: {
+            default: null,
+            "'Inter', sans-serif": {
+              url: "https://fonts.googleapis.com/css?family=Inter",
+              active: true
+            }
           }
         }
       },
       (error: any, result: any) => {
         if (error) {
-          console.error("Upload error:", error);
-          alert("Upload failed. Please try again.");
+          console.error("❌ Cloudinary upload error:", error);
+          alert("Upload failed: " + (error.message || "Unknown error"));
           setUploading(false);
           return;
         }
 
+        console.log("📸 Cloudinary event:", result?.event);
+
         if (result?.event === "success") {
+          console.log("✅ Upload successful:", result.info.secure_url);
           setFormData((prev) => ({ 
             ...prev, 
             image_url: result.info.secure_url 
           }));
           setUploading(false);
           widget.close();
+        }
+        
+        if (result?.event === "close") {
+          console.log("🔒 Widget closed");
+          setUploading(false);
+        }
+
+        if (result?.event === "abort") {
+          console.log("⚠️ Upload aborted");
+          setUploading(false);
         }
       }
     );
@@ -183,17 +226,18 @@ export default function ProductsManagement() {
     if (!color.startsWith("#")) color = "#" + color;
 
     const regex = /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/;
-    if (!regex.test(color)) return alert("Invalid hex color");
+    if (!regex.test(color)) {
+      alert("Invalid hex color. Use format: #FF0000 or FF0000");
+      return;
+    }
 
     if (color.length === 4) {
-      color =
-        "#" +
-        color[1] +
-        color[1] +
-        color[2] +
-        color[2] +
-        color[3] +
-        color[3];
+      color = "#" + color[1] + color[1] + color[2] + color[2] + color[3] + color[3];
+    }
+
+    if (formData.colors.includes(color.toUpperCase())) {
+      alert("This color is already added");
+      return;
     }
 
     setFormData((prev) => ({
@@ -221,8 +265,35 @@ export default function ProductsManagement() {
   };
 
   const handleSubmit = async () => {
-    if (!formData.sizes.length) return alert("Select at least one size");
-    if (!formData.colors.length) return alert("Add at least one color");
+    // Validation
+    if (!formData.name.trim()) {
+      alert("Product name is required");
+      return;
+    }
+    if (formData.price <= 0) {
+      alert("Price must be greater than 0");
+      return;
+    }
+    if (!formData.category) {
+      alert("Please select a category");
+      return;
+    }
+    if (!formData.sizes.length) {
+      alert("Select at least one size");
+      return;
+    }
+    if (!formData.colors.length) {
+      alert("Add at least one color");
+      return;
+    }
+    if (formData.stock < 0) {
+      alert("Stock cannot be negative");
+      return;
+    }
+    if (!formData.image_url.trim()) {
+      alert("Please upload a product image");
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -240,19 +311,19 @@ export default function ProductsManagement() {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error);
 
-      alert(editingProduct ? "Updated!" : "Created!");
+      alert(editingProduct ? "Product updated successfully!" : "Product created successfully!");
 
       await fetchProducts();
       handleCloseModal();
     } catch (err: any) {
-      alert(err.message);
+      alert("Error: " + err.message);
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Delete this product?")) return;
+    if (!confirm("Are you sure you want to delete this product?")) return;
 
     try {
       const res = await fetch(`/api/admin/products?id=${id}`, {
@@ -262,10 +333,10 @@ export default function ProductsManagement() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
 
-      alert("Deleted!");
+      alert("Product deleted successfully!");
       fetchProducts();
     } catch (err: any) {
-      alert(err.message);
+      alert("Error: " + err.message);
     }
   };
 
@@ -281,7 +352,7 @@ export default function ProductsManagement() {
     return matchesSearch && matchesGender && matchesCategory;
   });
 
-  // PAGINATION CALC
+  // PAGINATION
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
   const indexOfLast = currentPage * itemsPerPage;
   const indexOfFirst = indexOfLast - itemsPerPage;
@@ -294,18 +365,26 @@ export default function ProductsManagement() {
 
   if (loading)
     return (
-      <div className="flex justify-center items-center h-72">Loading...</div>
+      <div className="flex justify-center items-center h-96">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading products...</p>
+        </div>
+      </div>
     );
 
   return (
     <div className="p-6 space-y-6">
       {/* HEADER */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Products Management</h1>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Products Management</h1>
+          <p className="text-gray-600 mt-1">{filteredProducts.length} products found</p>
+        </div>
 
         <button
           onClick={() => handleOpenModal()}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg flex items-center gap-2 hover:bg-blue-700 transition"
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg flex items-center gap-2 hover:bg-blue-700 transition shadow-lg"
         >
           <Plus size={20} /> Add Product
         </button>
@@ -313,12 +392,15 @@ export default function ProductsManagement() {
 
       {/* FILTERS */}
       <div className="bg-white p-4 rounded-xl border shadow-sm space-y-4">
-        <div className="flex gap-4">
-          <div className="relative flex-1">
+        <div className="flex gap-4 flex-wrap">
+          <div className="relative flex-1 min-w-[250px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Search products..."
               className="w-full px-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
@@ -347,7 +429,6 @@ export default function ProductsManagement() {
             className="border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="all">All Categories</option>
-
             {(
               filterGender === "all"
                 ? Array.from(new Set([...CATEGORIES.Male, ...CATEGORIES.Female]))
@@ -361,57 +442,108 @@ export default function ProductsManagement() {
         </div>
       </div>
 
-      {/* LIST VIEW */}
+      {/* PRODUCTS LIST */}
       <div className="space-y-4">
-        {currentItems.map((product) => (
-          <div
-            key={product.id}
-            className="bg-white rounded-lg border p-4 flex gap-4 hover:shadow-md transition"
-          >
-            <img
-              src={product.image_url}
-              alt={product.name}
-              className="w-24 h-24 rounded object-cover"
-            />
-
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg">{product.name}</h3>
-              <p className="text-gray-600">{product.description}</p>
-              <p className="font-bold mt-2">₹{product.price}</p>
-
-              <p className="text-sm text-gray-500 mt-1">
-                {product.sizes.join(", ")}
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={() => handleOpenModal(product)}
-                className="px-4 py-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition"
-              >
-                <Edit size={18} />
-              </button>
-
-              <button
-                onClick={() => handleDelete(product.id!)}
-                className="px-4 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200 transition"
-              >
-                <Trash2 size={18} />
-              </button>
-            </div>
+        {currentItems.length === 0 ? (
+          <div className="bg-white rounded-lg border p-12 text-center">
+            <ImageIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500 text-lg">No products found</p>
+            <p className="text-gray-400 text-sm mt-2">Try adjusting your filters or add a new product</p>
           </div>
-        ))}
+        ) : (
+          currentItems.map((product) => (
+            <div
+              key={product.id}
+              className="bg-white rounded-lg border p-4 flex gap-4 hover:shadow-md transition"
+            >
+              <img
+                src={product.image_url}
+                alt={product.name}
+                className="w-24 h-24 rounded object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/96?text=No+Image';
+                }}
+              />
+
+              <div className="flex-1">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-semibold text-lg">{product.name}</h3>
+                    <p className="text-gray-600 text-sm line-clamp-2">{product.description}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleOpenModal(product)}
+                      className="p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition"
+                      title="Edit"
+                    >
+                      <Edit size={18} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(product.id!)}
+                      className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200 transition"
+                      title="Delete"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center gap-4 flex-wrap">
+                  <span className="font-bold text-blue-600 text-lg">₹{product.price.toLocaleString()}</span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    product.gender === 'Male' 
+                      ? 'bg-blue-100 text-blue-800' 
+                      : 'bg-pink-100 text-pink-800'
+                  }`}>
+                    {product.gender}
+                  </span>
+                  <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-semibold">
+                    {product.category}
+                  </span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    product.stock > 10 
+                      ? 'bg-green-100 text-green-800'
+                      : product.stock > 0
+                      ? 'bg-orange-100 text-orange-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    Stock: {product.stock}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    Sizes: {product.sizes.join(", ")}
+                  </span>
+                  <div className="flex gap-1">
+                    {product.colors.slice(0, 5).map((color, i) => (
+                      <div
+                        key={i}
+                        className="w-6 h-6 rounded-full border-2 border-gray-300"
+                        style={{ backgroundColor: color }}
+                        title={color}
+                      />
+                    ))}
+                    {product.colors.length > 5 && (
+                      <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs">
+                        +{product.colors.length - 5}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* PAGINATION */}
       {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-3 mt-6">
+        <div className="flex justify-center items-center gap-2">
           <button
             onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage === 1}
             className="px-4 py-2 border rounded disabled:opacity-40 hover:bg-gray-100 transition"
           >
-            Prev
+            Previous
           </button>
 
           {[...Array(totalPages)].map((_, i) => (
@@ -441,17 +573,21 @@ export default function ProductsManagement() {
       {/* MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
-            <div className="flex justify-between items-center sticky top-0 bg-white pb-4 border-b">
+          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white p-6 border-b flex justify-between items-center z-10">
               <h2 className="text-2xl font-bold">
-                {editingProduct ? "Edit Product" : "Add Product"}
+                {editingProduct ? "Edit Product" : "Add New Product"}
               </h2>
-              <button onClick={handleCloseModal} className="hover:bg-gray-100 p-2 rounded-full transition">
+              <button 
+                onClick={handleCloseModal} 
+                className="hover:bg-gray-100 p-2 rounded-full transition"
+                disabled={submitting || uploading}
+              >
                 <X size={24} />
               </button>
             </div>
 
-            <div className="space-y-6 mt-6">
+            <div className="p-6 space-y-6">
               {/* NAME */}
               <div>
                 <label className="block font-medium mb-1">Product Name *</label>
@@ -461,6 +597,7 @@ export default function ProductsManagement() {
                     setFormData({ ...formData, name: e.target.value })
                   }
                   className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., Premium Cotton T-Shirt"
                 />
               </div>
 
@@ -474,6 +611,7 @@ export default function ProductsManagement() {
                   }
                   rows={3}
                   className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Describe your product..."
                 />
               </div>
 
@@ -492,8 +630,8 @@ export default function ProductsManagement() {
                     }
                     className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option>Male</option>
-                    <option>Female</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
                   </select>
                 </div>
 
@@ -508,7 +646,7 @@ export default function ProductsManagement() {
                   >
                     <option value="">Select Category</option>
                     {CATEGORIES[formData.gender].map((c) => (
-                      <option key={c}>{c}</option>
+                      <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
                 </div>
@@ -517,9 +655,10 @@ export default function ProductsManagement() {
               {/* PRICE + STOCK */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-medium mb-1">Price *</label>
+                  <label className="block font-medium mb-1">Price (₹) *</label>
                   <input
                     type="number"
+                    min="0"
                     value={formData.price}
                     onChange={(e) =>
                       setFormData({
@@ -528,13 +667,15 @@ export default function ProductsManagement() {
                       })
                     }
                     className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-medium mb-1">Stock *</label>
+                  <label className="block font-medium mb-1">Stock Quantity *</label>
                   <input
                     type="number"
+                    min="0"
                     value={formData.stock}
                     onChange={(e) =>
                       setFormData({
@@ -543,60 +684,77 @@ export default function ProductsManagement() {
                       })
                     }
                     className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
                   />
                 </div>
               </div>
 
-              {/* IMAGE */}
+              {/* IMAGE UPLOAD */}
               <div>
-                <label className="block font-medium mb-1">Product Image *</label>
+                <label className="block font-medium mb-2">Product Image *</label>
 
-                <button
-                  onClick={handleCloudinaryUpload}
-                  disabled={uploading || !cloudinaryLoaded}
-                  className="w-full border-2 border-dashed rounded-lg p-6 text-center mt-2 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Upload size={32} className="mx-auto mb-2 text-blue-600" />
-                  <p className="font-medium text-gray-700">
-                    {uploading ? "Uploading..." : "Click to Upload Image"}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    PNG, JPG, JPEG or WEBP (Max 2MB)
-                  </p>
-                </button>
+                {!cloudinaryLoaded ? (
+                  <div className="w-full border-2 border-dashed rounded-lg p-6 text-center bg-gray-50">
+                    <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">Loading Cloudinary...</p>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleCloudinaryUpload}
+                    disabled={uploading}
+                    className="w-full border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Upload size={32} className="mx-auto mb-2 text-blue-600" />
+                    <p className="font-medium text-gray-700">
+                      {uploading ? "Uploading..." : "Click to Upload Image"}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      PNG, JPG, JPEG or WEBP (Max 2MB)
+                    </p>
+                    <p className="text-xs text-gray-400 mt-2">
+                      Cloudinary upload widget will open
+                    </p>
+                  </button>
+                )}
 
-                <div className="relative mt-3">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                    Or paste URL:
-                  </span>
+                {formData.image_url && (
+                  <div className="mt-4 relative">
+                    <img
+                      src={formData.image_url}
+                      className="w-full h-64 object-cover rounded-lg border"
+                      alt="Product preview"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, image_url: "" })}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+
+                <div className="mt-3">
                   <input
                     value={formData.image_url}
                     onChange={(e) =>
                       setFormData({ ...formData, image_url: e.target.value })
                     }
-                    className="w-full border px-4 py-2 pl-28 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="https://example.com/image.jpg"
+                    className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    placeholder="Or paste image URL here..."
                   />
                 </div>
-
-                {formData.image_url && (
-                  <div className="mt-3 relative">
-                    <img
-                      src={formData.image_url}
-                      className="w-full h-48 object-cover rounded-lg border"
-                      alt="Preview"
-                    />
-                  </div>
-                )}
               </div>
 
               {/* SIZES */}
               <div>
-                <label className="block font-medium mb-2">Sizes *</label>
+                <label className="block font-medium mb-2">Available Sizes *</label>
                 <div className="flex gap-2 flex-wrap">
                   {SIZES.map((s) => (
                     <button
                       key={s}
+                      type="button"
                       onClick={() => toggleSize(s)}
                       className={`px-4 py-2 border rounded-lg transition ${
                         formData.sizes.includes(s)
@@ -612,16 +770,17 @@ export default function ProductsManagement() {
 
               {/* COLORS */}
               <div>
-                <label className="block font-medium mb-2">Colors *</label>
+                <label className="block font-medium mb-2">Colors (Hex) *</label>
                 <div className="flex gap-2">
                   <input
                     value={colorInput}
                     onChange={(e) => setColorInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddColor()}
                     className="border px-4 py-2 rounded-lg flex-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Enter hex color (e.g., #FF5733 or FF5733)"
                   />
-
                   <button
+                    type="button"
                     onClick={handleAddColor}
                     className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                   >
@@ -629,43 +788,59 @@ export default function ProductsManagement() {
                   </button>
                 </div>
 
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {formData.colors.map((c) => (
-                    <div
-                      key={c}
-                      className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg hover:bg-gray-200 transition"
-                    >
+                {formData.colors.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {formData.colors.map((c) => (
                       <div
-                        className="w-6 h-6 rounded-full border-2 border-gray-300"
-                        style={{ backgroundColor: c }}
-                      />
-                      <span className="font-mono text-sm">{c}</span>
-                      <button
-                        onClick={() => removeColor(c)}
-                        className="text-red-500 hover:text-red-700 transition"
+                        key={c}
+                        className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg hover:bg-gray-200 transition"
                       >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                        <div
+                          className="w-6 h-6 rounded-full border-2 border-gray-300"
+                          style={{ backgroundColor: c }}
+                        />
+                        <span className="font-mono text-sm">{c}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeColor(c)}
+                          className="text-red-500 hover:text-red-700 transition"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* SUBMIT BUTTON */}
+              {/* SUBMIT */}
               <div className="flex gap-4 pt-4 border-t mt-6">
                 <button
+                  type="button"
                   onClick={handleCloseModal}
-                  className="flex-1 bg-gray-100 py-3 rounded-lg hover:bg-gray-200 transition font-medium"
+                  disabled={submitting || uploading}
+                  className="flex-1 bg-gray-100 py-3 rounded-lg hover:bg-gray-200 transition font-medium disabled:opacity-50"
                 >
                   Cancel
                 </button>
 
                 <button
+                  type="button"
                   onClick={handleSubmit}
-                  disabled={submitting}
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={submitting || uploading}
+                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {submitting ? "Saving..." : editingProduct ? "Update Product" : "Create Product"}
+                  {submitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={18} />
+                      {editingProduct ? "Update Product" : "Create Product"}
+                    </>
+                  )}
                 </button>
               </div>
             </div>
