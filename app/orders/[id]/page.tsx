@@ -1,5 +1,3 @@
-// app/orders/[id]/page.tsx
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -7,7 +5,16 @@ import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/context/auth-context"
 import { getOrderById, type Order } from "@/lib/supabase-orders"
 import Link from "next/link"
-import { Package, Truck, CheckCircle, Clock, MapPin, ArrowLeft } from "lucide-react"
+import {
+  Package,
+  Truck,
+  CheckCircle,
+  Clock,
+  MapPin,
+  ArrowLeft,
+  ArrowLeftRight,
+} from "lucide-react"
+import ExchangeRequestForm from "@/components/ExchangeRequestForm"
 
 export default function OrderDetailPage() {
   const params = useParams()
@@ -18,29 +25,28 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [showExchangeForm, setShowExchangeForm] = useState(false) // ✅ NEW
 
   useEffect(() => {
     if (!isLoggedIn) {
       router.push("/login")
       return
     }
-
     loadOrder()
   }, [isLoggedIn, orderId])
 
   const loadOrder = async () => {
     try {
       const orderData = await getOrderById(orderId)
-      
-      // Check if order belongs to current user
+
       if (orderData.user_id !== user?.id) {
         setError("You don't have permission to view this order")
         return
       }
 
       setOrder(orderData)
-    } catch (err: any) {
-      console.error("Failed to load order:", err)
+    } catch (err) {
+      console.error(err)
       setError("Failed to load order details")
     } finally {
       setLoading(false)
@@ -72,7 +78,7 @@ export default function OrderDetailPage() {
       delivered: "bg-green-100 text-green-800",
       cancelled: "bg-red-100 text-red-800",
     }
-    return colors[status as keyof typeof colors] || "bg-gray-100 text-gray-800"
+    return colors[status] || "bg-gray-100 text-gray-800"
   }
 
   const getPaymentStatusColor = (status: string) => {
@@ -82,7 +88,7 @@ export default function OrderDetailPage() {
       failed: "bg-red-100 text-red-800",
       refunded: "bg-gray-100 text-gray-800",
     }
-    return colors[status as keyof typeof colors] || "bg-gray-100 text-gray-800"
+    return colors[status] || "bg-gray-100 text-gray-800"
   }
 
   const getOrderTimeline = () => {
@@ -106,7 +112,7 @@ export default function OrderDetailPage() {
       })
     }
 
-    if (order.order_status === "confirmed" || order.order_status === "processing" || order.order_status === "shipped" || order.order_status === "delivered") {
+    if (["confirmed", "processing", "shipped", "delivered"].includes(order.order_status)) {
       timeline.push({
         status: "Order Confirmed",
         description: "Your order has been confirmed",
@@ -168,7 +174,6 @@ export default function OrderDetailPage() {
   return (
     <main className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Back Button */}
         <Link
           href="/orders"
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
@@ -183,7 +188,8 @@ export default function OrderDetailPage() {
             <div>
               <h1 className="text-3xl font-bold mb-2">Order #{order.order_number}</h1>
               <p className="text-muted-foreground">
-                Placed on {new Date(order.created_at!).toLocaleDateString("en-IN", {
+                Placed on{" "}
+                {new Date(order.created_at!).toLocaleDateString("en-IN", {
                   year: "numeric",
                   month: "long",
                   day: "numeric",
@@ -192,11 +198,21 @@ export default function OrderDetailPage() {
                 })}
               </p>
             </div>
+
             <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
-              <span className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(order.order_status)}`}>
+              <span
+                className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(
+                  order.order_status
+                )}`}
+              >
                 {order.order_status.toUpperCase()}
               </span>
-              <span className={`px-4 py-2 rounded-full text-sm font-semibold ${getPaymentStatusColor(order.payment_status)}`}>
+
+              <span
+                className={`px-4 py-2 rounded-full text-sm font-semibold ${getPaymentStatusColor(
+                  order.payment_status
+                )}`}
+              >
                 Payment: {order.payment_status.toUpperCase()}
               </span>
             </div>
@@ -204,8 +220,9 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Order Timeline */}
+          {/* Timeline + Items */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Timeline */}
             <div className="border border-border rounded-lg p-6">
               <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
                 {getStatusIcon(order.order_status)}
@@ -216,24 +233,33 @@ export default function OrderDetailPage() {
                 {timeline.map((item, index) => (
                   <div key={index} className="flex gap-4">
                     <div className="flex flex-col items-center">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        item.completed ? "bg-green-100" : "bg-gray-100"
-                      }`}>
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          item.completed ? "bg-green-100" : "bg-gray-100"
+                        }`}
+                      >
                         {item.completed ? (
                           <CheckCircle className="w-6 h-6 text-green-600" />
                         ) : (
                           <Clock className="w-6 h-6 text-gray-400" />
                         )}
                       </div>
+
                       {index < timeline.length - 1 && (
-                        <div className={`w-0.5 h-16 ${
-                          item.completed ? "bg-green-200" : "bg-gray-200"
-                        }`} />
+                        <div
+                          className={`w-0.5 h-16 ${
+                            item.completed ? "bg-green-200" : "bg-gray-200"
+                          }`}
+                        />
                       )}
                     </div>
+
                     <div className="flex-1 pb-8">
                       <h3 className="font-semibold mb-1">{item.status}</h3>
-                      <p className="text-sm text-muted-foreground mb-2">{item.description}</p>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {item.description}
+                      </p>
+
                       {item.timestamp && (
                         <p className="text-xs text-muted-foreground">
                           {new Date(item.timestamp).toLocaleDateString("en-IN", {
@@ -251,32 +277,63 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
-            {/* Order Items */}
+            {/* Items */}
             <div className="border border-border rounded-lg p-6">
               <h2 className="text-xl font-bold mb-6">Order Items</h2>
+
               <div className="space-y-4">
                 {order.items.map((item, index) => (
-                  <div key={index} className="flex gap-4 pb-4 border-b border-border last:border-0">
+                  <div
+                    key={index}
+                    className="flex gap-4 pb-4 border-b border-border last:border-0"
+                  >
                     <img
                       src={item.product_image || "/placeholder.svg"}
                       alt={item.product_name}
                       className="w-20 h-20 object-cover rounded-lg"
                     />
+
                     <div className="flex-1">
                       <h3 className="font-semibold mb-1">{item.product_name}</h3>
                       <p className="text-sm text-muted-foreground">
                         Size: {item.size} | Color: {item.color}
                       </p>
-                      <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Quantity: {item.quantity}
+                      </p>
                     </div>
+
                     <div className="text-right">
                       <p className="font-semibold">₹{item.subtotal.toFixed(2)}</p>
-                      <p className="text-sm text-muted-foreground">₹{item.price.toFixed(2)} each</p>
+                      <p className="text-sm text-muted-foreground">
+                        ₹{item.price.toFixed(2)} each
+                      </p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+
+            {/* NEW: Exchange Button + Form */}
+            {order.order_status === "delivered" && (
+              <button
+                onClick={() => setShowExchangeForm(!showExchangeForm)}
+                className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold flex items-center justify-center gap-2"
+              >
+                <ArrowLeftRight className="w-5 h-5" />
+                Request Exchange
+              </button>
+            )}
+
+            {showExchangeForm && (
+              <div className="border border-border rounded-lg p-6 mt-4">
+                <ExchangeRequestForm
+                  order={order}
+                  onClose={() => setShowExchangeForm(false)}
+                  onSuccess={() => setShowExchangeForm(false)}
+                />
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -284,19 +341,27 @@ export default function OrderDetailPage() {
             {/* Order Summary */}
             <div className="border border-border rounded-lg p-6">
               <h2 className="text-xl font-bold mb-4">Order Summary</h2>
+
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>₹{order.subtotal.toFixed(2)}</span>
                 </div>
+
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Tax</span>
                   <span>₹{order.tax.toFixed(2)}</span>
                 </div>
+
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Shipping</span>
-                  <span>{order.shipping_cost === 0 ? "Free" : `₹${order.shipping_cost.toFixed(2)}`}</span>
+                  <span>
+                    {order.shipping_cost === 0
+                      ? "Free"
+                      : `₹${order.shipping_cost.toFixed(2)}`}
+                  </span>
                 </div>
+
                 <div className="border-t border-border pt-3 flex justify-between font-bold text-lg">
                   <span>Total</span>
                   <span className="text-primary">₹{order.total.toFixed(2)}</span>
@@ -310,40 +375,65 @@ export default function OrderDetailPage() {
                 <MapPin className="w-5 h-5" />
                 Shipping Address
               </h2>
+
               <div className="text-sm space-y-1">
                 <p className="font-semibold">
-                  {order.shipping_address.first_name} {order.shipping_address.last_name}
+                  {order.shipping_address.first_name}{" "}
+                  {order.shipping_address.last_name}
                 </p>
-                <p className="text-muted-foreground">{order.shipping_address.phone}</p>
+
+                <p className="text-muted-foreground">
+                  {order.shipping_address.phone}
+                </p>
+
                 <p className="text-muted-foreground mt-2">
                   {order.shipping_address.address_line1}
-                  {order.shipping_address.address_line2 && `, ${order.shipping_address.address_line2}`}
+                  {order.shipping_address.address_line2 &&
+                    `, ${order.shipping_address.address_line2}`}
                 </p>
+
                 <p className="text-muted-foreground">
-                  {order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}
+                  {order.shipping_address.city},{" "}
+                  {order.shipping_address.state}{" "}
+                  {order.shipping_address.postal_code}
                 </p>
-                <p className="text-muted-foreground">{order.shipping_address.country}</p>
+
+                <p className="text-muted-foreground">
+                  {order.shipping_address.country}
+                </p>
               </div>
             </div>
 
             {/* Payment Info */}
             <div className="border border-border rounded-lg p-6">
               <h2 className="text-xl font-bold mb-4">Payment Information</h2>
+
               <div className="text-sm space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Method:</span>
-                  <span className="font-semibold capitalize">{order.payment_method}</span>
+                  <span className="font-semibold capitalize">
+                    {order.payment_method}
+                  </span>
                 </div>
+
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Status:</span>
-                  <span className={`px-2 py-1 rounded text-xs font-semibold ${getPaymentStatusColor(order.payment_status)}`}>
+
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-semibold ${getPaymentStatusColor(
+                      order.payment_status
+                    )}`}
+                  >
                     {order.payment_status.toUpperCase()}
                   </span>
                 </div>
+
                 {order.razorpay_payment_id && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Payment ID:</span>
-                    <span className="font-mono text-xs">{order.razorpay_payment_id.slice(0, 20)}...</span>
+                    <span className="font-mono text-xs">
+                      {order.razorpay_payment_id.slice(0, 20)}...
+                    </span>
                   </div>
                 )}
               </div>
