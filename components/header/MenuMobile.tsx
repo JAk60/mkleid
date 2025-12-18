@@ -25,7 +25,7 @@ const MenuMobile: React.FC<MenuMobileProps> = ({
 }) => {
   const data = [
     { id: 1, name: "Home", url: "/" },
-    { id: 2, name: "All Products", url: "/products" },
+    // { id: 2, name: "All Products", url: "/products" },
     { id: 3, name: "Male", subMenu: true },
     { id: 4, name: "Female", subMenu: true },
   ];
@@ -49,7 +49,7 @@ const MenuMobile: React.FC<MenuMobileProps> = ({
                 </div>
 
                 {item.name === "Male" && showMenCat && (
-                  <ul className="bg-[#E3D9C6]/[0.05] -mx-5 mt-4 -mb-4">
+                  <ul className="bg-[#E3D9C6]/5 -mx-5 mt-4 -mb-4">
                     {subMenuMenData.map((submenu) => {
                       return (
                         <Link
@@ -70,7 +70,7 @@ const MenuMobile: React.FC<MenuMobileProps> = ({
                 )}
 
                 {item.name === "Female" && showWomenCat && (
-                  <ul className="bg-[#E3D9C6]/[0.05] -mx-5 mt-4 -mb-4">
+                  <ul className="bg-[#E3D9C6]/5 -mx-5 mt-4 -mb-4">
                     {subMenuWomenData.map((submenu) => {
                       return (
                         <Link

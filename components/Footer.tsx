@@ -94,18 +94,6 @@ const Footer = () => {
 
           {/* Keep Up To Date */}
           <div>
-            <h3 className="text-yellow-400 font-bold text-lg mb-4">KEEP UP TO DATE</h3>
-            <div className="flex">
-              <input
-                type="email"
-                placeholder="Enter Email Id:"
-                className="flex-1 px-4 py-2 bg-transparent border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400"
-              />
-              <button className="bg-yellow-400 text-gray-900 px-6 py-2 font-bold hover:bg-yellow-500 transition-colors">
-                SUBSCRIBE
-              </button>
-            </div>
-
             {/* Payment Methods */}
             <div className="mt-8">
               <h4 className="text-yellow-400 font-bold text-sm mb-3">100% SECURE PAYMENT</h4>

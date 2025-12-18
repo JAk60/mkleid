@@ -1,4 +1,4 @@
-// components/header/index.tsx - FIXED MOBILE LOGO
+// components/header/index.tsx - MATCHING YOUR DESIGN
 
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
@@ -13,7 +13,7 @@ import { useAuth } from "@/context/auth-context";
 import { BsCart } from "react-icons/bs";
 import { BiMenuAltRight } from "react-icons/bi";
 import { VscChromeClose } from "react-icons/vsc";
-import { IoPersonOutline } from "react-icons/io5";
+import { IoPersonOutline, IoSearchOutline } from "react-icons/io5";
 
 const Header = () => {
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -92,20 +92,34 @@ const Header = () => {
 
   return (
     <header
-      className={`w-full h-[50px] md:h-20 bg-[#E3D9C6] flex items-center justify-between z-20 sticky top-0 transition-transform duration-300 ${show}`}
+      className={`w-full h-[60px] md:h-20 bg-[#E3D9C6] flex items-center justify-between z-20 sticky top-0 transition-transform duration-300 ${show}`}
     >
-      <Wrapper className="h-[60px] flex justify-between items-center">
-        <Link href="/" className="inline-block">
+      <Wrapper className="h-[60px] md:h-20 flex justify-between items-center">
+        {/* Mobile Menu Icon - LEFT SIDE */}
+        <div className="flex md:hidden w-10 h-10 rounded-full justify-center items-center cursor-pointer">
+          {mobileMenu ? (
+            <VscChromeClose
+              className="text-[24px]"
+              onClick={() => setMobileMenu(false)}
+            />
+          ) : (
+            <BiMenuAltRight
+              className="text-[28px]"
+              onClick={() => setMobileMenu(true)}
+            />
+          )}
+        </div>
+
+        {/* Logo - CENTERED ON MOBILE, LEFT ON DESKTOP */}
+        <Link href="/" className="absolute left-1/2 -translate-x-1/2 md:relative md:left-0 md:translate-x-0">
           <img
             src="/mk.png"
-            alt="MAAGNUS KLEID"
-            height={"300erm"}
-            width={"300rem"}
-            className="mt-6 font-(family-name:--font-paragraph) text-4xl md:text-6xl text-[#2C1810]"
+            alt="Maagnus Kleid"
+            className="h-120 mt-6 md:h-100  w-auto object-contain"
           />
         </Link>
 
-
+        {/* Desktop Menu */}
         <Menu
           showMenCat={showMenCat}
           setShowMenCat={setShowMenCat}
@@ -115,6 +129,7 @@ const Header = () => {
           subMenuWomenData={subMenuWomenData}
         />
 
+        {/* Mobile Menu Overlay */}
         {mobileMenu && (
           <MenuMobile
             showMenCat={showMenCat}
@@ -127,13 +142,14 @@ const Header = () => {
           />
         )}
 
-        <div className="flex items-center gap-2 text-black">
+        {/* Right Side Icons */}
+        <div className="flex items-center gap-3 md:gap-4 text-black">
           {/* Cart Icon */}
           <Link href="/cart">
-            <div className="w-8 md:w-12 h-8 md:h-12 rounded-full flex justify-center items-center hover:bg-[#E3D9C6]/[0.05] cursor-pointer relative">
-              <BsCart className="text-[15px] md:text-[20px]" />
+            <div className="w-10 md:w-12 h-10 md:h-12 flex justify-center items-center cursor-pointer relative">
+              <BsCart className="text-[22px] md:text-[24px]" />
               {itemCount > 0 && (
-                <div className="h-3.5 md:h-[18px] min-w-3.5 md:min-w-[18px] rounded-full bg-red-600 absolute top-1 left-5 md:left-7 text-white text-[10px] md:text-[12px] flex justify-center items-center px-[2px] md:px-[5px]">
+                <div className="h-5 w-5 rounded-full bg-red-600 absolute -top-1 -right-2 text-white text-[11px] flex justify-center items-center font-semibold">
                   {itemCount}
                 </div>
               )}
@@ -146,9 +162,9 @@ const Header = () => {
               <>
                 <div
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="w-8 md:w-12 h-8 md:h-12 rounded-full flex justify-center items-center hover:bg-[#E3D9C6]/[0.05] cursor-pointer"
+                  className="w-10 md:w-12 h-10 md:h-12 flex justify-center items-center cursor-pointer"
                 >
-                  <IoPersonOutline className="text-[19px] md:text-[24px]" />
+                  <IoPersonOutline className="text-[24px] md:text-[26px]" />
                 </div>
 
                 {showUserMenu && (
@@ -187,25 +203,10 @@ const Header = () => {
               </>
             ) : (
               <Link href="/login">
-                <div className="w-8 md:w-12 h-8 md:h-12 rounded-full flex justify-center items-center hover:bg-[#E3D9C6]/5 cursor-pointer">
-                  <IoPersonOutline className="text-[19px] md:text-[24px]" />
+                <div className="w-10 md:w-12 h-10 md:h-12 flex justify-center items-center cursor-pointer">
+                  <IoPersonOutline className="text-[24px] md:text-[26px]" />
                 </div>
               </Link>
-            )}
-          </div>
-
-          {/* Mobile icon */}
-          <div className="w-8 md:w-12 h-8 md:h-12 rounded-full flex md:hidden justify-center items-center hover:bg-[#E3D9C6]/5 cursor-pointer relative -mr-2">
-            {mobileMenu ? (
-              <VscChromeClose
-                className="text-[16px]"
-                onClick={() => setMobileMenu(false)}
-              />
-            ) : (
-              <BiMenuAltRight
-                className="text-[20px]"
-                onClick={() => setMobileMenu(true)}
-              />
             )}
           </div>
         </div>

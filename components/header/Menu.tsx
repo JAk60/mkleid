@@ -88,7 +88,7 @@ const Menu: React.FC<MenuProps> = ({
                             }
                           }}
                         >
-                          <li className="h-12 flex justify-between items-center px-3 hover:bg-[#E3D9C6]/[0.03] rounded-md">
+                          <li className="h-12 flex justify-between items-center px-3 hover:bg-[#E3D9C6]/3 rounded-md">
                             {submenu.name}
                           </li>
                         </Link>
@@ -111,7 +111,7 @@ const Menu: React.FC<MenuProps> = ({
                             }
                           }}
                         >
-                          <li className="h-12 flex justify-between items-center px-3 hover:bg-[#E3D9C6]/[0.03] rounded-md">
+                          <li className="h-12 flex justify-between items-center px-3 hover:bg-[#E3D9C6]/3 rounded-md">
                             {submenu.name}
                           </li>
                         </Link>

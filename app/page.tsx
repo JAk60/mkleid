@@ -59,8 +59,8 @@ export default function Home() {
 
   return (
     <>
-      <main className="min-h-screen bg-[#E3D9C6]">
-        <Marquee messages={messages} />
+      <main className="w-full min-h-screen bg-[#E3D9C6]">
+        {/* <Marquee messages={messages} /> */}
 
         {/* Hero Section - Animated */}
         <AnimateOnScroll delay={0}>
