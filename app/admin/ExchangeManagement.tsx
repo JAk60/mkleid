@@ -1,4 +1,4 @@
-// app/admin/ExchangeManagement.tsx
+// app/admin/ExchangeManagement.tsx - WITH SETTLEMENT LOGIC
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -10,8 +10,12 @@ import {
   Truck, 
   Eye,
   Search,
-  Filter,
-  Package
+  Package,
+  CreditCard,
+  Wallet,
+  AlertCircle,
+  Info,
+  DollarSign
 } from 'lucide-react';
 
 interface ExchangeRequest {
@@ -26,27 +30,45 @@ interface ExchangeRequest {
   exchange_type: 'size' | 'color' | 'product';
   reason: string;
   description?: string;
-  status: 'pending' | 'approved' | 'rejected' | 'shipped' | 'completed';
+  status: string;
+  
+  // Settlement fields
+  original_total: number;
+  requested_total: number;
+  price_difference: number;
+  tax_amount: number;
+  settlement_amount: number;
+  settlement_type: 'NO_CHARGE' | 'COLLECT_PAYMENT' | 'ISSUE_REFUND';
+  settlement_status: string;
+  
+  payment_details?: any;
+  payment_collected_at?: string;
+  refund_details?: any;
+  refund_issued_at?: string;
+  
   created_at: string;
   updated_at: string;
   approved_at?: string;
-  shipped_at?: string;
-  completed_at?: string;
   admin_notes?: string;
   tracking_number?: string;
+  
+  qc_status?: string;
+  qc_notes?: string;
 }
 
 export default function ExchangeManagement() {
   const [exchanges, setExchanges] = useState<ExchangeRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterSettlement, setFilterSettlement] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedExchange, setSelectedExchange] = useState<ExchangeRequest | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
-  const [actionType, setActionType] = useState<'approve' | 'reject' | 'ship' | 'complete'>('approve');
+  const [actionType, setActionType] = useState<'approve' | 'reject' | 'ship' | 'complete' | 'collect_payment' | 'issue_refund'>('approve');
   const [adminNotes, setAdminNotes] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
+  const [qcNotes, setQcNotes] = useState('');
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
@@ -73,38 +95,61 @@ export default function ExchangeManagement() {
     }
   };
 
-  const handleAction = (exchange: ExchangeRequest, action: 'approve' | 'reject' | 'ship' | 'complete') => {
+  const handleAction = (
+    exchange: ExchangeRequest, 
+    action: 'approve' | 'reject' | 'ship' | 'complete' | 'collect_payment' | 'issue_refund'
+  ) => {
     setSelectedExchange(exchange);
     setActionType(action);
     setAdminNotes('');
     setTrackingNumber('');
+    setQcNotes('');
     setShowActionModal(true);
   };
 
   const submitAction = async () => {
     if (!selectedExchange) return;
 
-    let newStatus: ExchangeRequest['status'] = selectedExchange.status;
+    let newStatus = selectedExchange.status;
+    let settlementStatus = selectedExchange.settlement_status;
     
+    // Validation
+    if (actionType === 'reject' && !adminNotes) {
+      alert('Please provide a reason for rejection');
+      return;
+    }
+    
+    if (actionType === 'ship' && !trackingNumber) {
+      alert('Please provide a tracking number');
+      return;
+    }
+    
+    if (actionType === 'issue_refund' && !qcNotes) {
+      alert('Please provide QC notes for refund');
+      return;
+    }
+
+    // Determine new status based on action
     switch (actionType) {
       case 'approve':
         newStatus = 'approved';
         break;
       case 'reject':
         newStatus = 'rejected';
-        if (!adminNotes) {
-          alert('Please provide a reason for rejection');
-          return;
-        }
         break;
       case 'ship':
         newStatus = 'shipped';
-        if (!trackingNumber) {
-          alert('Please provide a tracking number');
-          return;
-        }
         break;
       case 'complete':
+        newStatus = 'completed';
+        settlementStatus = 'COMPLETED';
+        break;
+      case 'collect_payment':
+        settlementStatus = 'PAYMENT_COLLECTED';
+        newStatus = 'approved'; // Move to approved after payment
+        break;
+      case 'issue_refund':
+        settlementStatus = 'REFUND_ISSUED';
         newStatus = 'completed';
         break;
     }
@@ -118,15 +163,17 @@ export default function ExchangeManagement() {
         body: JSON.stringify({
           id: selectedExchange.id,
           status: newStatus,
+          settlement_status: settlementStatus,
           admin_notes: adminNotes || undefined,
-          tracking_number: trackingNumber || undefined
+          tracking_number: trackingNumber || undefined,
+          qc_notes: qcNotes || undefined
         })
       });
 
       const data = await response.json();
 
       if (data.success) {
-        alert(`Exchange ${actionType}d successfully!`);
+        alert(`Exchange ${actionType.replace('_', ' ')} successfully!`);
         setShowActionModal(false);
         fetchExchanges();
       } else {
@@ -148,10 +195,12 @@ export default function ExchangeManagement() {
   const getStatusColor = (status: string) => {
     const colors = {
       pending: 'bg-yellow-100 text-yellow-800',
+      awaiting_payment: 'bg-orange-100 text-orange-800',
       approved: 'bg-blue-100 text-blue-800',
       rejected: 'bg-red-100 text-red-800',
       shipped: 'bg-purple-100 text-purple-800',
-      completed: 'bg-green-100 text-green-800'
+      completed: 'bg-green-100 text-green-800',
+      cancelled: 'bg-gray-100 text-gray-800'
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
@@ -159,6 +208,7 @@ export default function ExchangeManagement() {
   const getStatusIcon = (status: string) => {
     const icons = {
       pending: <Clock className="w-4 h-4" />,
+      awaiting_payment: <CreditCard className="w-4 h-4" />,
       approved: <CheckCircle className="w-4 h-4" />,
       rejected: <XCircle className="w-4 h-4" />,
       shipped: <Truck className="w-4 h-4" />,
@@ -167,20 +217,53 @@ export default function ExchangeManagement() {
     return icons[status as keyof typeof icons] || <Clock className="w-4 h-4" />;
   };
 
+  const getSettlementBadge = (exchange: ExchangeRequest) => {
+    switch (exchange.settlement_type) {
+      case 'NO_CHARGE':
+        return (
+          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+            No Charge
+          </span>
+        );
+      case 'COLLECT_PAYMENT':
+        return (
+          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+            Payment: ₹{exchange.settlement_amount.toFixed(2)}
+          </span>
+        );
+      case 'ISSUE_REFUND':
+        return (
+          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+            Refund: ₹{exchange.settlement_amount.toFixed(2)}
+          </span>
+        );
+    }
+  };
+
   const filteredExchanges = exchanges.filter(exchange => {
     const matchesSearch = 
       exchange.order_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       exchange.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       exchange.customer_email?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    return matchesSearch;
+    const matchesSettlement = filterSettlement === 'all' || 
+      exchange.settlement_type === filterSettlement;
+    
+    return matchesSearch && matchesSettlement;
   });
 
   const stats = {
     pending: exchanges.filter(e => e.status === 'pending').length,
+    awaiting_payment: exchanges.filter(e => e.status === 'awaiting_payment').length,
     approved: exchanges.filter(e => e.status === 'approved').length,
     shipped: exchanges.filter(e => e.status === 'shipped').length,
-    completed: exchanges.filter(e => e.status === 'completed').length
+    completed: exchanges.filter(e => e.status === 'completed').length,
+    total_payment_due: exchanges
+      .filter(e => e.settlement_type === 'COLLECT_PAYMENT' && e.settlement_status === 'PAYMENT_REQUIRED')
+      .reduce((sum, e) => sum + e.settlement_amount, 0),
+    total_refund_pending: exchanges
+      .filter(e => e.settlement_type === 'ISSUE_REFUND' && e.settlement_status === 'REFUND_PENDING')
+      .reduce((sum, e) => sum + e.settlement_amount, 0)
   };
 
   return (
@@ -188,38 +271,45 @@ export default function ExchangeManagement() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Exchange Management</h1>
-        <p className="text-gray-600 mt-1">Manage customer exchange requests</p>
+        <p className="text-gray-600 mt-1">Manage customer exchange requests with settlement tracking</p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded-xl border">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-600">Pending</span>
+            <span className="text-sm text-gray-600">Pending Review</span>
             <Clock className="w-5 h-5 text-yellow-500" />
           </div>
           <p className="text-3xl font-bold text-gray-900">{stats.pending}</p>
         </div>
+        
         <div className="bg-white p-6 rounded-xl border">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-600">Approved</span>
-            <CheckCircle className="w-5 h-5 text-blue-500" />
+            <span className="text-sm text-gray-600">Awaiting Payment</span>
+            <CreditCard className="w-5 h-5 text-orange-500" />
+          </div>
+          <p className="text-3xl font-bold text-gray-900">{stats.awaiting_payment}</p>
+          <p className="text-xs text-gray-500 mt-1">₹{stats.total_payment_due.toFixed(2)} due</p>
+        </div>
+        
+        <div className="bg-white p-6 rounded-xl border">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-gray-600">Ready to Ship</span>
+            <Truck className="w-5 h-5 text-blue-500" />
           </div>
           <p className="text-3xl font-bold text-gray-900">{stats.approved}</p>
         </div>
+        
         <div className="bg-white p-6 rounded-xl border">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-600">Shipped</span>
-            <Truck className="w-5 h-5 text-purple-500" />
+            <span className="text-sm text-gray-600">Refunds Pending</span>
+            <Wallet className="w-5 h-5 text-purple-500" />
           </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.shipped}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl border">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-600">Completed</span>
-            <Package className="w-5 h-5 text-green-500" />
-          </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.completed}</p>
+          <p className="text-3xl font-bold text-gray-900">
+            {exchanges.filter(e => e.settlement_status === 'REFUND_PENDING').length}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">₹{stats.total_refund_pending.toFixed(2)} to refund</p>
         </div>
       </div>
 
@@ -235,6 +325,7 @@ export default function ExchangeManagement() {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
+        
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
@@ -242,10 +333,22 @@ export default function ExchangeManagement() {
         >
           <option value="all">All Status</option>
           <option value="pending">Pending</option>
+          <option value="awaiting_payment">Awaiting Payment</option>
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
           <option value="shipped">Shipped</option>
           <option value="completed">Completed</option>
+        </select>
+        
+        <select
+          value={filterSettlement}
+          onChange={(e) => setFilterSettlement(e.target.value)}
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="all">All Settlement Types</option>
+          <option value="NO_CHARGE">No Charge</option>
+          <option value="COLLECT_PAYMENT">Collect Payment</option>
+          <option value="ISSUE_REFUND">Issue Refund</option>
         </select>
       </div>
 
@@ -255,10 +358,10 @@ export default function ExchangeManagement() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Request ID</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Settlement</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -284,12 +387,8 @@ export default function ExchangeManagement() {
                 filteredExchanges.map((exchange) => (
                   <tr key={exchange.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-mono text-gray-900">
-                        {exchange.id.slice(0, 8)}...
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">#{exchange.order_number}</div>
+                      <div className="text-xs text-gray-500">{exchange.id.slice(0, 8)}...</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{exchange.customer_name}</div>
@@ -299,6 +398,9 @@ export default function ExchangeManagement() {
                       <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
                         {exchange.exchange_type}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getSettlementBadge(exchange)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(exchange.created_at).toLocaleDateString()}
@@ -319,6 +421,7 @@ export default function ExchangeManagement() {
                           <Eye className="w-4 h-4" />
                         </button>
                         
+                        {/* Status-specific actions */}
                         {exchange.status === 'pending' && (
                           <>
                             <button
@@ -338,6 +441,16 @@ export default function ExchangeManagement() {
                           </>
                         )}
                         
+                        {exchange.status === 'awaiting_payment' && (
+                          <button
+                            onClick={() => handleAction(exchange, 'collect_payment')}
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
+                            title="Confirm Payment Received"
+                          >
+                            <DollarSign className="w-4 h-4" />
+                          </button>
+                        )}
+                        
                         {exchange.status === 'approved' && (
                           <button
                             onClick={() => handleAction(exchange, 'ship')}
@@ -348,7 +461,17 @@ export default function ExchangeManagement() {
                           </button>
                         )}
                         
-                        {exchange.status === 'shipped' && (
+                        {exchange.status === 'shipped' && exchange.settlement_type === 'ISSUE_REFUND' && (
+                          <button
+                            onClick={() => handleAction(exchange, 'issue_refund')}
+                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg"
+                            title="Issue Refund (After QC)"
+                          >
+                            <Wallet className="w-4 h-4" />
+                          </button>
+                        )}
+                        
+                        {exchange.status === 'shipped' && exchange.settlement_type !== 'ISSUE_REFUND' && (
                           <button
                             onClick={() => handleAction(exchange, 'complete')}
                             className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
@@ -382,6 +505,60 @@ export default function ExchangeManagement() {
             </div>
 
             <div className="p-6 space-y-6">
+              {/* Settlement Info */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-blue-600" />
+                  Settlement Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Settlement Type</p>
+                    <p className="font-semibold">{selectedExchange.settlement_type.replace('_', ' ')}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Settlement Status</p>
+                    <p className="font-semibold">{selectedExchange.settlement_status.replace('_', ' ')}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Original Total</p>
+                    <p className="font-semibold">₹{selectedExchange.original_total.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Replacement Total</p>
+                    <p className="font-semibold">₹{selectedExchange.requested_total.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Price Difference</p>
+                    <p className={`font-semibold ${selectedExchange.price_difference >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {selectedExchange.price_difference >= 0 ? '+' : ''}₹{selectedExchange.price_difference.toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Settlement Amount</p>
+                    <p className="font-semibold text-lg">₹{selectedExchange.settlement_amount.toFixed(2)}</p>
+                  </div>
+                </div>
+                
+                {selectedExchange.settlement_type === 'COLLECT_PAYMENT' && selectedExchange.settlement_status === 'PAYMENT_REQUIRED' && (
+                  <div className="mt-3 bg-orange-50 border border-orange-200 rounded p-3">
+                    <p className="text-sm text-orange-800 flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                      Customer must pay ₹{selectedExchange.settlement_amount.toFixed(2)} before exchange can proceed.
+                    </p>
+                  </div>
+                )}
+                
+                {selectedExchange.settlement_type === 'ISSUE_REFUND' && selectedExchange.settlement_status === 'REFUND_PENDING' && (
+                  <div className="mt-3 bg-purple-50 border border-purple-200 rounded p-3">
+                    <p className="text-sm text-purple-800 flex items-start gap-2">
+                      <Info className="w-4 h-4 mt-0.5 shrink-0" />
+                      Issue refund of ₹{selectedExchange.settlement_amount.toFixed(2)} after QC approval.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* Customer & Order Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -418,7 +595,7 @@ export default function ExchangeManagement() {
                         <p className="text-sm text-gray-600">
                           Size: {item.size} | Color: {item.color} | Qty: {item.quantity}
                         </p>
-                        <p className="text-sm font-semibold">₹{item.price}</p>
+                        <p className="text-sm font-semibold">₹{item.original_price.toFixed(2)}</p>
                       </div>
                     </div>
                   ))}
@@ -437,7 +614,7 @@ export default function ExchangeManagement() {
                         <p className="text-sm text-gray-600">
                           Size: {item.size} | Color: {item.color} | Qty: {item.quantity}
                         </p>
-                        <p className="text-sm font-semibold">₹{item.price}</p>
+                        <p className="text-sm font-semibold">₹{(item.current_price || item.original_price).toFixed(2)}</p>
                       </div>
                     </div>
                   ))}
@@ -468,6 +645,15 @@ export default function ExchangeManagement() {
                   <p className="text-sm font-mono">{selectedExchange.tracking_number}</p>
                 </div>
               )}
+
+              {/* QC Notes */}
+              {selectedExchange.qc_notes && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <h3 className="font-semibold mb-2">Quality Check Notes</h3>
+                  <p className="text-sm">{selectedExchange.qc_notes}</p>
+                  <p className="text-xs text-gray-500 mt-2">Status: {selectedExchange.qc_status}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -482,7 +668,19 @@ export default function ExchangeManagement() {
               {actionType === 'reject' && 'Reject Exchange'}
               {actionType === 'ship' && 'Mark as Shipped'}
               {actionType === 'complete' && 'Complete Exchange'}
+              {actionType === 'collect_payment' && 'Confirm Payment Received'}
+              {actionType === 'issue_refund' && 'Issue Refund (After QC)'}
             </h2>
+
+            {/* Settlement Warning */}
+            {actionType === 'approve' && selectedExchange.settlement_type === 'COLLECT_PAYMENT' && (
+              <div className="mb-4 bg-orange-50 border border-orange-200 rounded-lg p-3">
+                <p className="text-sm text-orange-800 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  Customer must pay ₹{selectedExchange.settlement_amount.toFixed(2)} before shipping.
+                </p>
+              </div>
+            )}
 
             {actionType === 'reject' && (
               <div className="mb-4">
@@ -519,6 +717,48 @@ export default function ExchangeManagement() {
                     className="w-full px-4 py-2 border rounded-lg"
                     rows={3}
                     placeholder="Any additional notes..."
+                  />
+                </div>
+              </>
+            )}
+
+            {actionType === 'collect_payment' && (
+              <div className="mb-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-green-800">
+                    Confirm that customer has paid ₹{selectedExchange.settlement_amount.toFixed(2)}
+                  </p>
+                </div>
+                <label className="block text-sm font-medium mb-2">Payment Notes (optional)</label>
+                <textarea
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg"
+                  rows={3}
+                  placeholder="Payment transaction details..."
+                />
+              </div>
+            )}
+
+            {actionType === 'issue_refund' && (
+              <>
+                <div className="mb-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <p className="text-sm text-purple-800">
+                    Refund amount: ₹{selectedExchange.settlement_amount.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-purple-600 mt-2">
+                    Ensure item has passed quality check before issuing refund
+                  </p>
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">Quality Check Notes *</label>
+                  <textarea
+                    value={qcNotes}
+                    onChange={(e) => setQcNotes(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg"
+                    rows={4}
+                    placeholder="Document QC results and item condition..."
+                    required
                   />
                 </div>
               </>
