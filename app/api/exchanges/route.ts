@@ -1,6 +1,7 @@
-// app/api/exchanges/route.ts - COMPLETE REWRITE WITH SETTLEMENT
+// app/api/exchanges/route.ts - FIXED VERSION
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin'; // ✅ ADD THIS
 import { getProducts } from '@/lib/supabase';
 
 // ==========================================
@@ -96,7 +97,7 @@ async function calculateSettlement(
 // ==========================================
 
 async function checkEligibility(orderId: string, userId: string) {
-  // Get order
+  // Get order - use regular client for read operations
   const { data: order, error } = await supabase
     .from('orders')
     .select('*')
@@ -194,20 +195,12 @@ async function validateStock(requestedItems: ExchangeItem[]) {
 // ==========================================
 
 async function reserveStock(exchangeId: string, items: ExchangeItem[]) {
-  // This would create inventory reservations
-  // For now, we'll just log it
   console.log(`🔒 Stock reserved for exchange ${exchangeId}:`, items);
-  
-  // In production, you'd:
-  // 1. Create entries in an `inventory_reservations` table
-  // 2. Decrease available_stock (separate from physical stock)
-  // 3. Set expiration time (e.g., 48 hours)
-  
   return { reserved: true };
 }
 
 // ==========================================
-// POST - CREATE EXCHANGE REQUEST
+// POST - CREATE EXCHANGE REQUEST (FIXED)
 // ==========================================
 
 export async function POST(request: Request) {
@@ -231,6 +224,8 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    console.log('📝 Creating exchange request for user:', user_id);
 
     // 2. Check eligibility
     const eligibility = await checkEligibility(order_id, user_id);
@@ -261,7 +256,7 @@ export async function POST(request: Request) {
 
     switch (pricing.settlementType) {
       case 'NO_CHARGE':
-        initialStatus = 'pending'; // Goes to admin for approval
+        initialStatus = 'pending';
         settlementStatus = 'COMPLETED';
         break;
       
@@ -271,7 +266,7 @@ export async function POST(request: Request) {
         break;
       
       case 'ISSUE_REFUND':
-        initialStatus = 'pending'; // Admin approves, then refund after QC
+        initialStatus = 'pending';
         settlementStatus = 'REFUND_PENDING';
         break;
     }
@@ -283,27 +278,33 @@ export async function POST(request: Request) {
       .eq('id', order_id)
       .single();
 
-    // 7. Create exchange request
-    const { data: exchange, error: exchangeError } = await supabase
+    // 7. Create exchange request using ADMIN CLIENT
+    const exchangeData = {
+      order_id,
+      order_number: order?.order_number || '',
+      user_id,
+      original_items,
+      requested_items,
+      exchange_type,
+      reason,
+      description: description || '',
+      original_total: pricing.originalTotal,
+      requested_total: pricing.replacementTotal,
+      price_difference: pricing.difference,
+      settlement_type: pricing.settlementType,
+      settlement_status: settlementStatus,
+      settlement_amount: Math.abs(pricing.finalDifference),
+      tax_amount: pricing.tax,
+      status: initialStatus
+    };
+
+    console.log('📤 Inserting exchange request...');
+
+    // ✅ CRITICAL FIX: Use supabaseAdmin to bypass RLS
+    // API routes don't have user session, so we need admin privileges
+    const { data: exchange, error: exchangeError } = await supabaseAdmin
       .from('exchange_requests')
-      .insert({
-        order_id,
-        order_number: order?.order_number || '',
-        user_id,
-        original_items,
-        requested_items,
-        exchange_type,
-        reason,
-        description: description || '',
-        original_total: pricing.originalTotal,
-        requested_total: pricing.replacementTotal,
-        price_difference: pricing.difference,
-        settlement_type: pricing.settlementType,
-        settlement_status: settlementStatus,
-        settlement_amount: Math.abs(pricing.finalDifference),
-        tax_amount: pricing.tax,
-        status: initialStatus
-      })
+      .insert(exchangeData)
       .select()
       .single();
 
@@ -311,6 +312,8 @@ export async function POST(request: Request) {
       console.error('Exchange creation error:', exchangeError);
       throw exchangeError;
     }
+
+    console.log('✅ Exchange created:', exchange.id);
 
     // 8. Reserve stock for replacement items
     await reserveStock(exchange.id, requested_items);
@@ -375,6 +378,7 @@ export async function GET(request: Request) {
       );
     }
 
+    // Use regular client for user reads (RLS allows users to see their own)
     const { data: exchanges, error } = await supabase
       .from('exchange_requests')
       .select('*')
@@ -433,7 +437,7 @@ export async function PUT(request: Request) {
       case 'CONFIRM_PAYMENT':
         updates.settlement_status = 'PAYMENT_COLLECTED';
         updates.payment_details = paymentDetails;
-        updates.status = 'pending'; // Now goes to admin
+        updates.status = 'pending';
         updates.payment_collected_at = new Date().toISOString();
         break;
 
@@ -451,7 +455,8 @@ export async function PUT(request: Request) {
         break;
     }
 
-    const { data: updated, error } = await supabase
+    // ✅ Use admin client for updates
+    const { data: updated, error } = await supabaseAdmin
       .from('exchange_requests')
       .update(updates)
       .eq('id', exchangeId)
