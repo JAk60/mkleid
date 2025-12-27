@@ -81,6 +81,10 @@ export interface ExchangeEligibility {
 // ELIGIBILITY CHECKING
 // ==========================================
 
+// lib/supabase-exchanges.ts - FIXED DUPLICATE PREVENTION
+
+// Update the checkExchangeEligibility function:
+
 export async function checkExchangeEligibility(
   orderId: string,
   userId: string
@@ -147,17 +151,55 @@ export async function checkExchangeEligibility(
       warnings.push(`Only ${daysRemaining} days remaining to exchange this order`);
     }
 
-    // Check for existing exchange requests
+    // ✅ FIXED: Check for ANY existing exchange requests (including rejected/cancelled)
     const { data: existingExchanges } = await supabase
       .from('exchange_requests')
-      .select('id, status')
-      .eq('order_id', orderId)
-      .in('status', ['pending', 'approved', 'processing', 'shipped']);
+      .select('id, status, original_items')
+      .eq('order_id', orderId);
 
-    if (existingExchanges && existingExchanges.length > 0) {
+    // Check for active exchanges
+    const activeExchanges = existingExchanges?.filter(e => 
+      ['pending', 'awaiting_payment', 'approved', 'processing', 'shipped'].includes(e.status)
+    );
+
+    if (activeExchanges && activeExchanges.length > 0) {
       return {
         eligible: false,
-        reason: 'An exchange request is already in progress for this order'
+        reason: 'An exchange request is already in progress for this order. You cannot create multiple exchange requests.'
+      };
+    }
+
+    // ✅ NEW: Calculate which items have already been exchanged
+    const exchangedItemsMap = new Map<string, number>();
+    
+    // Include completed exchanges in the calculation
+    const completedExchanges = existingExchanges?.filter(e => 
+      e.status === 'completed'
+    ) || [];
+
+    completedExchanges.forEach(exchange => {
+      exchange.original_items.forEach((item: any) => {
+        const key = `${item.product_id}-${item.size}-${item.color}`;
+        const current = exchangedItemsMap.get(key) || 0;
+        exchangedItemsMap.set(key, current + item.quantity);
+      });
+    });
+
+    // Check if ALL items have been fully exchanged
+    let allItemsExchanged = true;
+    for (const orderItem of order.items) {
+      const key = `${orderItem.product_id}-${orderItem.size}-${orderItem.color}`;
+      const exchangedQty = exchangedItemsMap.get(key) || 0;
+      if (exchangedQty < orderItem.quantity) {
+        allItemsExchanged = false;
+        break;
+      }
+    }
+
+    if (allItemsExchanged) {
+      return {
+        eligible: false,
+        reason: 'All items from this order have already been exchanged.'
       };
     }
 
@@ -173,6 +215,75 @@ export async function checkExchangeEligibility(
       eligible: false,
       reason: 'Unable to verify exchange eligibility. Please try again.'
     };
+  }
+}
+
+// ✅ NEW: Function to get available items for exchange
+export async function getAvailableItemsForExchange(orderId: string): Promise<{
+  items: Array<{
+    product_id: number;
+    product_name: string;
+    product_image: string;
+    size: string;
+    color: string;
+    original_quantity: number;
+    exchanged_quantity: number;
+    available_quantity: number;
+  }>;
+  message?: string;
+}> {
+  try {
+    // Get order
+    const { data: order } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .single();
+
+    if (!order) {
+      return { items: [], message: 'Order not found' };
+    }
+
+    // Get all completed exchanges
+    const { data: exchanges } = await supabase
+      .from('exchange_requests')
+      .select('original_items')
+      .eq('order_id', orderId)
+      .eq('status', 'completed');
+
+    // Calculate exchanged quantities
+    const exchangedMap = new Map<string, number>();
+    exchanges?.forEach(exchange => {
+      exchange.original_items.forEach((item: any) => {
+        const key = `${item.product_id}-${item.size}-${item.color}`;
+        const current = exchangedMap.get(key) || 0;
+        exchangedMap.set(key, current + item.quantity);
+      });
+    });
+
+    // Build available items list
+    const availableItems = order.items.map((item: any) => {
+      const key = `${item.product_id}-${item.size}-${item.color}`;
+      const exchangedQty = exchangedMap.get(key) || 0;
+      const availableQty = item.quantity - exchangedQty;
+
+      return {
+        product_id: item.product_id,
+        product_name: item.product_name,
+        product_image: item.product_image,
+        size: item.size,
+        color: item.color,
+        original_quantity: item.quantity,
+        exchanged_quantity: exchangedQty,
+        available_quantity: availableQty
+      };
+    }).filter((item: { available_quantity: number; }) => item.available_quantity > 0);
+
+    return { items: availableItems };
+
+  } catch (error: any) {
+    console.error('Error getting available items:', error);
+    return { items: [], message: 'Error loading available items' };
   }
 }
 
