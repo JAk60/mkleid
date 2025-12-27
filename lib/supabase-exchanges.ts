@@ -1,6 +1,4 @@
-// ==========================================
-// lib/supabase-exchanges.ts - COMPLETE REWRITE
-// ==========================================
+// lib/supabase-exchanges.ts - FIXED DUPLICATE PREVENTION
 
 import { supabase } from './supabase';
 import { Product } from './types';
@@ -18,9 +16,9 @@ export interface ExchangeItem {
   size: string;
   color: string;
   quantity: number;
-  original_price: number; // Price at time of original order
-  current_price?: number; // Current market price (for validation)
-  available_for_exchange?: number; // Quantity not yet exchanged
+  original_price: number;
+  current_price?: number;
+  available_for_exchange?: number;
 }
 
 export interface ExchangeRequest {
@@ -44,7 +42,7 @@ export interface ExchangeRequest {
   price_difference: number;
   
   // Status tracking
-  status: 'pending' | 'approved' | 'rejected' | 'processing' | 'shipped' | 'completed' | 'cancelled';
+  status: 'pending' | 'awaiting_payment' | 'approved' | 'rejected' | 'processing' | 'shipped' | 'completed' | 'cancelled';
   
   // Timestamps
   created_at?: string;
@@ -75,15 +73,16 @@ export interface ExchangeEligibility {
   reason?: string;
   warnings?: string[];
   daysRemaining?: number;
+  existingExchange?: {
+    id: string;
+    status: string;
+    created_at: string;
+  };
 }
 
 // ==========================================
-// ELIGIBILITY CHECKING
+// ELIGIBILITY CHECKING - FIXED
 // ==========================================
-
-// lib/supabase-exchanges.ts - FIXED DUPLICATE PREVENTION
-
-// Update the checkExchangeEligibility function:
 
 export async function checkExchangeEligibility(
   orderId: string,
@@ -102,6 +101,39 @@ export async function checkExchangeEligibility(
       return {
         eligible: false,
         reason: 'Order not found or does not belong to you'
+      };
+    }
+
+    // ✅ CRITICAL FIX: Check for ANY active exchange first
+    const { data: existingExchanges, error: exchangeError } = await supabase
+      .from('exchange_requests')
+      .select('id, status, created_at')
+      .eq('order_id', orderId)
+      .in('status', ['pending', 'awaiting_payment', 'approved', 'processing', 'shipped']);
+
+    if (exchangeError) {
+      console.error('Error checking existing exchanges:', exchangeError);
+    }
+
+    // If there's ANY active exchange, block immediately
+    if (existingExchanges && existingExchanges.length > 0) {
+      const activeExchange = existingExchanges[0];
+      
+      // Format status for user-friendly message
+      const statusMessages: Record<string, string> = {
+        'pending': 'pending admin review',
+        'awaiting_payment': 'awaiting your payment',
+        'approved': 'approved and ready to ship',
+        'processing': 'being processed',
+        'shipped': 'already shipped'
+      };
+
+      const statusText = statusMessages[activeExchange.status] || activeExchange.status;
+
+      return {
+        eligible: false,
+        reason: `An exchange request for this order is already ${statusText}. You cannot create multiple exchange requests for the same order. Please wait for the current exchange to complete or contact support.`,
+        existingExchange: activeExchange
       };
     }
 
@@ -125,7 +157,7 @@ export async function checkExchangeEligibility(
     if (!order.delivered_at) {
       return {
         eligible: false,
-        reason: 'Delivery date not recorded'
+        reason: 'Delivery date not recorded. Please contact support.'
       };
     }
 
@@ -140,7 +172,7 @@ export async function checkExchangeEligibility(
     if (daysSinceDelivery > EXCHANGE_WINDOW_DAYS) {
       return {
         eligible: false,
-        reason: `Exchange window has expired. Items must be exchanged within ${EXCHANGE_WINDOW_DAYS} days of delivery.`
+        reason: `Exchange window has expired. Items must be exchanged within ${EXCHANGE_WINDOW_DAYS} days of delivery. Your order was delivered ${daysSinceDelivery} days ago.`
       };
     }
 
@@ -148,59 +180,44 @@ export async function checkExchangeEligibility(
     const warnings: string[] = [];
 
     if (daysRemaining <= 5) {
-      warnings.push(`Only ${daysRemaining} days remaining to exchange this order`);
+      warnings.push(`Only ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining to exchange this order`);
     }
 
-    // ✅ FIXED: Check for ANY existing exchange requests (including rejected/cancelled)
-    const { data: existingExchanges } = await supabase
+    // Check if ALL items have been fully exchanged in COMPLETED exchanges
+    const { data: completedExchanges } = await supabase
       .from('exchange_requests')
-      .select('id, status, original_items')
-      .eq('order_id', orderId);
+      .select('original_items')
+      .eq('order_id', orderId)
+      .eq('status', 'completed');
 
-    // Check for active exchanges
-    const activeExchanges = existingExchanges?.filter(e => 
-      ['pending', 'awaiting_payment', 'approved', 'processing', 'shipped'].includes(e.status)
-    );
-
-    if (activeExchanges && activeExchanges.length > 0) {
-      return {
-        eligible: false,
-        reason: 'An exchange request is already in progress for this order. You cannot create multiple exchange requests.'
-      };
-    }
-
-    // ✅ NEW: Calculate which items have already been exchanged
-    const exchangedItemsMap = new Map<string, number>();
-    
-    // Include completed exchanges in the calculation
-    const completedExchanges = existingExchanges?.filter(e => 
-      e.status === 'completed'
-    ) || [];
-
-    completedExchanges.forEach(exchange => {
-      exchange.original_items.forEach((item: any) => {
-        const key = `${item.product_id}-${item.size}-${item.color}`;
-        const current = exchangedItemsMap.get(key) || 0;
-        exchangedItemsMap.set(key, current + item.quantity);
+    if (completedExchanges && completedExchanges.length > 0) {
+      const exchangedItemsMap = new Map<string, number>();
+      
+      completedExchanges.forEach(exchange => {
+        exchange.original_items.forEach((item: any) => {
+          const key = `${item.product_id}-${item.size}-${item.color}`;
+          const current = exchangedItemsMap.get(key) || 0;
+          exchangedItemsMap.set(key, current + item.quantity);
+        });
       });
-    });
 
-    // Check if ALL items have been fully exchanged
-    let allItemsExchanged = true;
-    for (const orderItem of order.items) {
-      const key = `${orderItem.product_id}-${orderItem.size}-${orderItem.color}`;
-      const exchangedQty = exchangedItemsMap.get(key) || 0;
-      if (exchangedQty < orderItem.quantity) {
-        allItemsExchanged = false;
-        break;
+      // Check if ALL items have been fully exchanged
+      let allItemsExchanged = true;
+      for (const orderItem of order.items) {
+        const key = `${orderItem.product_id}-${orderItem.size}-${orderItem.color}`;
+        const exchangedQty = exchangedItemsMap.get(key) || 0;
+        if (exchangedQty < orderItem.quantity) {
+          allItemsExchanged = false;
+          break;
+        }
       }
-    }
 
-    if (allItemsExchanged) {
-      return {
-        eligible: false,
-        reason: 'All items from this order have already been exchanged.'
-      };
+      if (allItemsExchanged) {
+        return {
+          eligible: false,
+          reason: 'All items from this order have already been exchanged. You cannot exchange the same items multiple times.'
+        };
+      }
     }
 
     return {
@@ -213,12 +230,15 @@ export async function checkExchangeEligibility(
     console.error('Exchange eligibility check error:', error);
     return {
       eligible: false,
-      reason: 'Unable to verify exchange eligibility. Please try again.'
+      reason: 'Unable to verify exchange eligibility. Please try again or contact support.'
     };
   }
 }
 
-// ✅ NEW: Function to get available items for exchange
+// ==========================================
+// GET AVAILABLE ITEMS FOR EXCHANGE
+// ==========================================
+
 export async function getAvailableItemsForExchange(orderId: string): Promise<{
   items: Array<{
     product_id: number;
@@ -430,7 +450,6 @@ export async function validateReplacements(
       // Type-specific validation
       switch (exchangeType) {
         case 'size': {
-          // Must keep same product and color, change size
           if (replacement.product_id !== original.product_id) {
             errors.push(`Product cannot be changed in size exchange for ${original.product_name}`);
           }
@@ -441,7 +460,6 @@ export async function validateReplacements(
             errors.push(`New size must be different from original for ${original.product_name}`);
           }
 
-          // Verify size availability
           const product = productMap.get(original.product_id);
           if (product && !product.sizes.includes(replacement.size)) {
             errors.push(
@@ -453,7 +471,6 @@ export async function validateReplacements(
         }
 
         case 'color': {
-          // Must keep same product and size, change color
           if (replacement.product_id !== original.product_id) {
             errors.push(`Product cannot be changed in color exchange for ${original.product_name}`);
           }
@@ -464,7 +481,6 @@ export async function validateReplacements(
             errors.push(`New color must be different from original for ${original.product_name}`);
           }
 
-          // Verify color availability
           const product = productMap.get(original.product_id);
           if (product && !product.colors.includes(replacement.color)) {
             errors.push(
@@ -476,7 +492,6 @@ export async function validateReplacements(
         }
 
         case 'product': {
-          // Can change everything but must have valid new product
           if (replacement.product_id === original.product_id) {
             errors.push(`New product must be different from original for ${original.product_name}`);
           }
@@ -487,7 +502,6 @@ export async function validateReplacements(
             continue;
           }
 
-          // Check stock
           if (newProduct.stock < replacement.quantity) {
             errors.push(
               `Insufficient stock for ${newProduct.name}. ` +
@@ -495,7 +509,6 @@ export async function validateReplacements(
             );
           }
 
-          // Verify size and color for new product
           if (!newProduct.sizes.includes(replacement.size)) {
             errors.push(
               `Size "${replacement.size}" not available for ${newProduct.name}. ` +
@@ -510,7 +523,6 @@ export async function validateReplacements(
             );
           }
 
-          // Price difference warning
           const priceDiff = Math.abs(newProduct.price - original.original_price);
           const percentDiff = (priceDiff / original.original_price) * 100;
 
@@ -633,7 +645,7 @@ export async function createExchangeRequest(
   exchangeData: Omit<ExchangeRequest, 'id' | 'created_at' | 'updated_at'>
 ): Promise<{ success: boolean; data?: ExchangeRequest; error?: string }> {
   try {
-    // 1. Check eligibility
+    // 1. Check eligibility (includes duplicate check)
     const eligibility = await checkExchangeEligibility(
       exchangeData.order_id,
       exchangeData.user_id
@@ -776,7 +788,6 @@ export async function updateExchangeStatus(
   if (rejectionReason) updates.rejection_reason = rejectionReason;
   if (trackingNumber) updates.tracking_number = trackingNumber;
 
-  // Set timestamp fields based on status
   if (status === 'approved') updates.approved_at = new Date().toISOString();
   if (status === 'rejected') updates.rejected_at = new Date().toISOString();
   if (status === 'shipped') updates.shipped_at = new Date().toISOString();

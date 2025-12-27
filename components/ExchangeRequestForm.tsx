@@ -1,4 +1,4 @@
-// components/ExchangeRequestForm.tsx - COMPLETE WITH SETTLEMENT
+// components/ExchangeRequestForm.tsx - COMPLETE WITH DUPLICATE PREVENTION
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -10,7 +10,8 @@ import {
   Loader2,
   CreditCard,
   Wallet,
-  Info
+  Info,
+  AlertTriangle
 } from 'lucide-react';
 import { getProducts } from '@/lib/supabase';
 import { Product } from '@/lib/types';
@@ -38,7 +39,7 @@ type ExchangeType = 'size' | 'color' | 'product';
 
 export default function ExchangeRequestForm({ order, onClose, onSuccess }: ExchangeRequestFormProps) {
   // State
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0); // 0 = checking eligibility, 1-3 = form steps
   const [exchangeType, setExchangeType] = useState<ExchangeType>('size');
   const [selectedItems, setSelectedItems] = useState<ExchangeItem[]>([]);
   const [replacementItems, setReplacementItems] = useState<ExchangeItem[]>([]);
@@ -51,6 +52,61 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
   const [warnings, setWarnings] = useState<string[]>([]);
   const [success, setSuccess] = useState(false);
   const [exchangeResponse, setExchangeResponse] = useState<any>(null);
+  const [eligibilityChecked, setEligibilityChecked] = useState(false);
+  const [isEligible, setIsEligible] = useState(false);
+
+  // ✅ CHECK ELIGIBILITY ON MOUNT
+  useEffect(() => {
+    checkEligibility();
+  }, []);
+
+  const checkEligibility = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      console.log('🔍 Checking eligibility for order:', order.id);
+
+      const response = await fetch(
+        `/api/exchanges/eligibility?orderId=${order.id}&userId=${order.user_id}`
+      );
+      
+      const data = await response.json();
+
+      console.log('📊 Eligibility result:', data);
+
+      if (!data.success) {
+        setError(data.error || 'Failed to check eligibility');
+        setIsEligible(false);
+        setEligibilityChecked(true);
+        return;
+      }
+
+      if (!data.eligible) {
+        setError(data.reason || 'This order is not eligible for exchange');
+        setIsEligible(false);
+        setEligibilityChecked(true);
+        return;
+      }
+
+      // Eligible!
+      setIsEligible(true);
+      setEligibilityChecked(true);
+      setStep(1); // Move to first form step
+
+      if (data.warnings && data.warnings.length > 0) {
+        setWarnings(data.warnings);
+      }
+
+    } catch (err: any) {
+      console.error('❌ Eligibility check error:', err);
+      setError('Failed to verify exchange eligibility. Please try again.');
+      setIsEligible(false);
+      setEligibilityChecked(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Load products when items selected
   useEffect(() => {
@@ -250,6 +306,8 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
     setError('');
 
     try {
+      console.log('📤 Submitting exchange request...');
+
       const response = await fetch('/api/exchanges', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -267,8 +325,18 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
 
       const data = await response.json();
 
+      console.log('📥 Response:', data);
+
       if (!data.success) {
-        setError(data.error || 'Failed to submit exchange request');
+        // ✅ Show clear error message for duplicates
+        if (data.error.includes('already exists') || data.error.includes('already in progress')) {
+          setError(
+            'You have already submitted an exchange request for this order. ' +
+            'Please check your existing exchange requests in "My Orders".'
+          );
+        } else {
+          setError(data.error || 'Failed to submit exchange request');
+        }
         return;
       }
 
@@ -276,7 +344,7 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
       setSuccess(true);
 
     } catch (err: any) {
-      console.error('Exchange submission error:', err);
+      console.error('❌ Exchange submission error:', err);
       setError('Network error. Please check your connection and try again.');
     } finally {
       setLoading(false);
@@ -284,6 +352,35 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
   };
 
   const pricing = calculatePricing();
+
+  // ✅ ELIGIBILITY CHECK SCREEN
+  if (!eligibilityChecked || step === 0) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl max-w-md w-full p-8">
+          {loading ? (
+            <div className="text-center">
+              <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Checking Eligibility</h3>
+              <p className="text-gray-600">Verifying if this order can be exchanged...</p>
+            </div>
+          ) : !isEligible ? (
+            <div className="text-center">
+              <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+              <h3 className="text-xl font-bold mb-3 text-red-900">Not Eligible for Exchange</h3>
+              <p className="text-gray-700 mb-6">{error}</p>
+              <button
+                onClick={onClose}
+                className="w-full py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold"
+              >
+                Close
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   // Success state with settlement info
   if (success && exchangeResponse) {
