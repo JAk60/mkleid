@@ -332,7 +332,7 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
         if (data.error.includes('already exists') || data.error.includes('already in progress')) {
           setError(
             'You have already submitted an exchange request for this order. ' +
-            'Please check your existing exchange requests in "My Orders".'
+            'Please check your registered mail".'
           );
         } else {
           setError(data.error || 'Failed to submit exchange request');

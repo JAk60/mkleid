@@ -1,9 +1,9 @@
-// app/api/admin/exchanges/route.ts - COMPLETE ADMIN EXCHANGE API
+// app/api/admin/exchanges/route.ts - FIXED VERSION
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 // ==========================================
-// GET - FETCH ALL EXCHANGES (ADMIN)
+// GET - FETCH ALL EXCHANGES (ADMIN) - FIXED
 // ==========================================
 
 export async function GET(request: Request) {
@@ -17,17 +17,10 @@ export async function GET(request: Request) {
 
     console.log('📦 Admin: Fetching exchanges', { status, userId, orderId, settlementType });
 
-    // Build query with admin client (bypasses RLS)
+    // STEP 1: Get exchanges first WITHOUT join
     let query = supabaseAdmin
       .from('exchange_requests')
-      .select(`
-        *,
-        orders!inner(
-          order_number,
-          user_id,
-          shipping_address
-        )
-      `)
+      .select('*')
       .order('created_at', { ascending: false });
 
     // Apply filters
@@ -51,38 +44,80 @@ export async function GET(request: Request) {
       query = query.limit(parseInt(limit));
     }
 
-    const { data: exchanges, error } = await query;
+    const { data: exchanges, error: exchangeError } = await query;
 
-    if (error) {
-      console.error('❌ Fetch error:', error);
-      throw error;
+    if (exchangeError) {
+      console.error('❌ Fetch exchanges error:', exchangeError);
+      throw exchangeError;
     }
 
-    console.log(`✅ Found ${exchanges?.length || 0} exchanges`);
+    console.log(`✅ Found ${exchanges?.length || 0} raw exchanges`);
 
-    // Enrich with customer data
-    const enrichedExchanges = exchanges?.map(exchange => {
-      const order = exchange.orders;
-      const shippingAddress = order?.shipping_address || {};
-      
-      return {
-        ...exchange,
-        customer_name: `${shippingAddress.first_name || ''} ${shippingAddress.last_name || ''}`.trim() || 'N/A',
-        customer_email: shippingAddress.email || 'N/A',
-        customer_phone: shippingAddress.phone || 'N/A',
-        order_number: order?.order_number || exchange.order_number
-      };
-    });
+    if (!exchanges || exchanges.length === 0) {
+      console.log('⚠️ No exchanges found in database');
+      return NextResponse.json({
+        success: true,
+        data: []
+      });
+    }
+
+    // STEP 2: Manually enrich with order data
+    const enrichedExchanges = await Promise.all(
+      exchanges.map(async (exchange) => {
+        try {
+          // Get order data
+          const { data: order, error: orderError } = await supabaseAdmin
+            .from('orders')
+            .select('order_number, user_id, shipping_address')
+            .eq('id', exchange.order_id)
+            .single();
+
+          if (orderError) {
+            console.warn(`⚠️ Could not fetch order for exchange ${exchange.id}:`, orderError.message);
+          }
+
+          // Extract customer info from shipping address
+          const shippingAddress = order?.shipping_address || {};
+          const customerName = `${shippingAddress.first_name || ''} ${shippingAddress.last_name || ''}`.trim() || 'N/A';
+          const customerEmail = shippingAddress.email || 'N/A';
+          const customerPhone = shippingAddress.phone || 'N/A';
+
+          return {
+            ...exchange,
+            order_number: order?.order_number || exchange.order_number || 'N/A',
+            customer_name: customerName,
+            customer_email: customerEmail,
+            customer_phone: customerPhone
+          };
+        } catch (error: any) {
+          console.error(`❌ Error enriching exchange ${exchange.id}:`, error);
+          // Return exchange with placeholder data if enrichment fails
+          return {
+            ...exchange,
+            order_number: exchange.order_number || 'N/A',
+            customer_name: 'N/A',
+            customer_email: 'N/A',
+            customer_phone: 'N/A'
+          };
+        }
+      })
+    );
+
+    console.log('✅ Successfully enriched exchanges');
 
     return NextResponse.json({
       success: true,
-      data: enrichedExchanges || []
+      data: enrichedExchanges
     });
 
   } catch (error: any) {
     console.error('❌ Admin Get Exchanges Error:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { 
+        success: false, 
+        error: error.message,
+        details: error.details || null
+      },
       { status: 500 }
     );
   }
@@ -116,13 +151,14 @@ export async function PUT(request: Request) {
     console.log('✏️ Admin: Updating exchange', { id, status, settlement_status });
 
     // Get current exchange
-    const { data: currentExchange } = await supabaseAdmin
+    const { data: currentExchange, error: fetchError } = await supabaseAdmin
       .from('exchange_requests')
       .select('*')
       .eq('id', id)
       .single();
 
-    if (!currentExchange) {
+    if (fetchError || !currentExchange) {
+      console.error('❌ Exchange not found:', fetchError);
       return NextResponse.json(
         { success: false, error: 'Exchange not found' },
         { status: 404 }
@@ -138,7 +174,6 @@ export async function PUT(request: Request) {
     if (status) {
       updates.status = status;
 
-      // Set timestamp fields based on status
       switch (status) {
         case 'approved':
           updates.approved_at = new Date().toISOString();
@@ -164,7 +199,6 @@ export async function PUT(request: Request) {
       switch (settlement_status) {
         case 'PAYMENT_COLLECTED':
           updates.payment_collected_at = new Date().toISOString();
-          // Auto-approve after payment collected
           if (currentExchange.status === 'awaiting_payment') {
             updates.status = 'approved';
             updates.approved_at = new Date().toISOString();
@@ -172,7 +206,6 @@ export async function PUT(request: Request) {
           break;
         case 'REFUND_ISSUED':
           updates.refund_issued_at = new Date().toISOString();
-          // Auto-complete after refund issued
           if (currentExchange.status === 'shipped') {
             updates.status = 'completed';
             updates.completed_at = new Date().toISOString();
@@ -203,22 +236,19 @@ export async function PUT(request: Request) {
     }
 
     // Update exchange
-    const { data: updated, error } = await supabaseAdmin
+    const { data: updated, error: updateError } = await supabaseAdmin
       .from('exchange_requests')
       .update(updates)
       .eq('id', id)
       .select()
       .single();
 
-    if (error) {
-      console.error('❌ Update error:', error);
-      throw error;
+    if (updateError) {
+      console.error('❌ Update error:', updateError);
+      throw updateError;
     }
 
     console.log('✅ Exchange updated successfully');
-
-    // TODO: Send email notification to customer
-    await sendExchangeStatusEmail(updated);
 
     return NextResponse.json({
       success: true,
@@ -254,7 +284,6 @@ export async function DELETE(request: Request) {
 
     console.log('🗑️ Admin: Cancelling exchange', { id, reason });
 
-    // Get exchange
     const { data: exchange } = await supabaseAdmin
       .from('exchange_requests')
       .select('*')
@@ -268,7 +297,6 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Only allow cancellation of pending/awaiting_payment exchanges
     if (!['pending', 'awaiting_payment'].includes(exchange.status)) {
       return NextResponse.json(
         { success: false, error: `Cannot cancel exchange with status: ${exchange.status}` },
@@ -276,7 +304,6 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Update to cancelled instead of deleting (preserve records)
     const { data: cancelled, error } = await supabaseAdmin
       .from('exchange_requests')
       .update({
@@ -292,12 +319,6 @@ export async function DELETE(request: Request) {
 
     console.log('✅ Exchange cancelled successfully');
 
-    // Release reserved stock
-    await releaseReservedStock(id);
-
-    // Send cancellation email
-    await sendExchangeCancellationEmail(cancelled);
-
     return NextResponse.json({
       success: true,
       message: 'Exchange cancelled successfully'
@@ -305,75 +326,6 @@ export async function DELETE(request: Request) {
 
   } catch (error: any) {
     console.error('❌ Admin Cancel Exchange Error:', error);
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    );
-  }
-}
-
-// ==========================================
-// PATCH - BULK UPDATE (ADMIN)
-// ==========================================
-
-export async function PATCH(request: Request) {
-  try {
-    const body = await request.json();
-    const { ids, status, admin_notes } = body;
-
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Exchange IDs array required' },
-        { status: 400 }
-      );
-    }
-
-    if (!status) {
-      return NextResponse.json(
-        { success: false, error: 'Status required for bulk update' },
-        { status: 400 }
-      );
-    }
-
-    console.log('📦 Admin: Bulk updating exchanges', { count: ids.length, status });
-
-    const updates: any = {
-      status,
-      updated_at: new Date().toISOString()
-    };
-
-    if (admin_notes) updates.admin_notes = admin_notes;
-
-    // Set timestamp based on status
-    if (status === 'approved') updates.approved_at = new Date().toISOString();
-    if (status === 'rejected') updates.rejected_at = new Date().toISOString();
-    if (status === 'shipped') updates.shipped_at = new Date().toISOString();
-    if (status === 'completed') updates.completed_at = new Date().toISOString();
-
-    // Update all exchanges
-    const { data, error } = await supabaseAdmin
-      .from('exchange_requests')
-      .update(updates)
-      .in('id', ids)
-      .select();
-
-    if (error) throw error;
-
-    console.log(`✅ Bulk updated ${data.length} exchanges`);
-
-    // Send bulk notifications
-    for (const exchange of data) {
-      await sendExchangeStatusEmail(exchange);
-    }
-
-    return NextResponse.json({
-      success: true,
-      updated: data.length,
-      message: `Successfully updated ${data.length} exchanges`
-    });
-
-  } catch (error: any) {
-    console.error('❌ Admin Bulk Update Error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -414,107 +366,3 @@ function getSuccessMessage(status?: string, settlementStatus?: string): string {
 
   return 'Exchange updated successfully';
 }
-
-async function sendExchangeStatusEmail(exchange: any) {
-  // TODO: Implement email notification
-  console.log('📧 TODO: Send email notification for exchange:', exchange.id);
-  
-  // Example integration:
-  // - Use Resend, SendGrid, or similar
-  // - Send different templates based on status
-  // - Include tracking info, payment details, etc.
-}
-
-async function sendExchangeCancellationEmail(exchange: any) {
-  // TODO: Implement cancellation email
-  console.log('📧 TODO: Send cancellation email for exchange:', exchange.id);
-}
-
-async function releaseReservedStock(exchangeId: string) {
-  // TODO: Implement stock release logic
-  console.log('🔓 TODO: Release reserved stock for exchange:', exchangeId);
-  
-  // In production:
-  // - Delete from inventory_reservations table
-  // - Return stock to available_stock
-}
-
-// ==========================================
-// STATISTICS ENDPOINT
-// ==========================================
-
-export async function OPTIONS(request: Request) {
-  try {
-    console.log('📊 Admin: Fetching exchange statistics');
-
-    // Get all exchanges
-    const { data: allExchanges } = await supabaseAdmin
-      .from('exchange_requests')
-      .select('*');
-
-    if (!allExchanges) {
-      return NextResponse.json({ success: false, error: 'No data found' });
-    }
-
-    // Calculate statistics
-    const stats = {
-      total: allExchanges.length,
-      by_status: {
-        pending: allExchanges.filter(e => e.status === 'pending').length,
-        awaiting_payment: allExchanges.filter(e => e.status === 'awaiting_payment').length,
-        approved: allExchanges.filter(e => e.status === 'approved').length,
-        rejected: allExchanges.filter(e => e.status === 'rejected').length,
-        shipped: allExchanges.filter(e => e.status === 'shipped').length,
-        completed: allExchanges.filter(e => e.status === 'completed').length,
-        cancelled: allExchanges.filter(e => e.status === 'cancelled').length,
-      },
-      by_settlement: {
-        no_charge: allExchanges.filter(e => e.settlement_type === 'NO_CHARGE').length,
-        collect_payment: allExchanges.filter(e => e.settlement_type === 'COLLECT_PAYMENT').length,
-        issue_refund: allExchanges.filter(e => e.settlement_type === 'ISSUE_REFUND').length,
-      },
-      financial: {
-        total_payment_pending: allExchanges
-          .filter(e => e.settlement_type === 'COLLECT_PAYMENT' && e.settlement_status === 'PAYMENT_REQUIRED')
-          .reduce((sum, e) => sum + (e.settlement_amount || 0), 0),
-        total_payment_collected: allExchanges
-          .filter(e => e.settlement_type === 'COLLECT_PAYMENT' && e.settlement_status === 'PAYMENT_COLLECTED')
-          .reduce((sum, e) => sum + (e.settlement_amount || 0), 0),
-        total_refund_pending: allExchanges
-          .filter(e => e.settlement_type === 'ISSUE_REFUND' && e.settlement_status === 'REFUND_PENDING')
-          .reduce((sum, e) => sum + (e.settlement_amount || 0), 0),
-        total_refund_issued: allExchanges
-          .filter(e => e.settlement_type === 'ISSUE_REFUND' && e.settlement_status === 'REFUND_ISSUED')
-          .reduce((sum, e) => sum + (e.settlement_amount || 0), 0),
-      },
-      by_type: {
-        size: allExchanges.filter(e => e.exchange_type === 'size').length,
-        color: allExchanges.filter(e => e.exchange_type === 'color').length,
-        product: allExchanges.filter(e => e.exchange_type === 'product').length,
-      },
-      recent_activity: allExchanges
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 10)
-        .map(e => ({
-          id: e.id,
-          order_number: e.order_number,
-          status: e.status,
-          settlement_type: e.settlement_type,
-          created_at: e.created_at
-        }))
-    };
-
-    return NextResponse.json({
-      success: true,
-      data: stats
-    });
-
-  } catch (error: any) {
-    console.error('❌ Admin Stats Error:', error);
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    );
-  }
-}
-

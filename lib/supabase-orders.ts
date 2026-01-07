@@ -129,16 +129,84 @@ export async function deleteAddress(id: string) {
 
 // ========== ORDER FUNCTIONS ==========
 
+
+// In-memory rate limit for order creation (per user)
+const orderCreationLimits = new Map<string, { count: number; resetTime: number }>();
+
+function checkOrderCreationLimit(userId: string): { allowed: boolean; message?: string } {
+  const now = Date.now();
+  const userLimit = orderCreationLimits.get(userId);
+  
+  const LIMIT = 3; // 3 orders
+  const WINDOW = 10 * 60 * 1000; // per 10 minutes
+
+  if (!userLimit || userLimit.resetTime < now) {
+    orderCreationLimits.set(userId, {
+      count: 1,
+      resetTime: now + WINDOW,
+    });
+    return { allowed: true };
+  }
+
+  if (userLimit.count >= LIMIT) {
+    const minutesLeft = Math.ceil((userLimit.resetTime - now) / 1000 / 60);
+    return {
+      allowed: false,
+      message: `Too many orders. Please wait ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'} before placing another order.`
+    };
+  }
+
+  userLimit.count++;
+  return { allowed: true };
+}
+
+// UPDATE your createOrder function
 export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'created_at' | 'updated_at'>) {
+  // Check rate limit
+  const rateLimitCheck = checkOrderCreationLimit(order.user_id);
+  if (!rateLimitCheck.allowed) {
+    throw new Error(rateLimitCheck.message || 'Rate limit exceeded');
+  }
+
+  // Validate order data
+  if (!order.user_id) {
+    throw new Error('User ID is required');
+  }
+
+  if (!order.items || order.items.length === 0) {
+    throw new Error('Order must contain at least one item');
+  }
+
+  if (order.total <= 0) {
+    throw new Error('Invalid order total');
+  }
+
+  if (!order.shipping_address) {
+    throw new Error('Shipping address is required');
+  }
+
+  // Validate each item
+  for (const item of order.items) {
+    if (!item.product_id || !item.product_name || item.quantity <= 0 || item.price <= 0) {
+      throw new Error(`Invalid item data for ${item.product_name}`);
+    }
+  }
+
+  // Create order
   const { data, error } = await supabase
     .from('orders')
     .insert(order)
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Order creation error:', error);
+    throw new Error(error.message || 'Failed to create order');
+  }
+
   return data as Order;
 }
+
 
 export async function getOrders(userId: string) {
   const { data, error } = await supabase

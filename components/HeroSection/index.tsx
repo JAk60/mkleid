@@ -193,21 +193,42 @@ function Carousel({ products, title, gender }: CarouselProps) {
         </div>
       </div>
 
-      <div className="absolute bottom-20 md:bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-2 md:gap-3">
+      {/* Navigation Arrows - Desktop Only */}
+      <button
+        onClick={() => { prevSlide(); startAutoSlide(); }}
+        className="hidden md:flex absolute left-4 lg:left-8 top-1/2 -translate-y-1/2 z-20 w-12 h-12 items-center justify-center bg-black/30 backdrop-blur-sm text-white rounded-full border border-white/20 hover:bg-[#E3D9C6] hover:text-black transition-all"
+      >
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      <button
+        onClick={() => { nextSlide(); startAutoSlide(); }}
+        className="hidden md:flex absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 z-20 w-12 h-12 items-center justify-center bg-black/30 backdrop-blur-sm text-white rounded-full border border-white/20 hover:bg-[#E3D9C6] hover:text-black transition-all"
+      >
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+
+      {/* Pagination Dots - Desktop Only */}
+      <div className="hidden md:flex absolute bottom-8 left-1/2 -translate-x-1/2 z-20 gap-3">
         {products.map((_, i) => (
           <button
             key={i}
             onClick={() => goToSlide(i)}
             className={`transition-all ${
               i === currentIndex
-                ? "w-8 md:w-12 h-2 md:h-3 bg-[#E3D9C6]"
-                : "w-2 md:w-3 h-2 md:h-3 bg-[#E3D9C6]/40 hover:bg-[#E3D9C6]/60"
+                ? "w-12 h-3 bg-[#E3D9C6]"
+                : "w-3 h-3 bg-[#E3D9C6]/40 hover:bg-[#E3D9C6]/60"
             } rounded-full`}
           />
         ))}
       </div>
 
-      <div className="absolute top-4 md:top-8 right-4 md:right-8 z-20 text-white text-xs md:text-sm font-semibold bg-black/20 backdrop-blur-sm px-3 py-1.5 md:px-4 md:py-2 rounded-full border border-white/10">
+      {/* Slide Counter - Desktop Only */}
+      <div className="hidden md:block absolute top-8 right-8 z-20 text-white text-sm font-semibold bg-black/20 backdrop-blur-sm px-4 py-2 rounded-full border border-white/10">
         {currentIndex + 1} / {products.length}
       </div>
     </div>
