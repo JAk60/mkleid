@@ -24,6 +24,7 @@ import CustomersManagement from '../CustomersManagement';
 import AnalyticsPage from '../AnalyticsPage';
 import CategoryManagement from '../CategoriesManagement';
 import ExchangeManagement from '../ExchangeManagement';
+import StockAlerts from '../StockAlerts';
 export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeMenu, setActiveMenu] = useState('dashboard');
@@ -38,6 +39,7 @@ export default function AdminDashboard() {
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'categories', label: 'Categories', icon: BarChart3 },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'stocks', label: 'Stock Alerts', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -57,6 +59,8 @@ export default function AdminDashboard() {
         return <CategoryManagement />;
       case 'analytics':
         return <AnalyticsPage />;
+      case 'stocks':
+        return <StockAlerts />;
       case 'settings':
         return <SettingsPage />;
       default:

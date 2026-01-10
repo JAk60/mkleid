@@ -22,6 +22,37 @@ export default function ProductCard({ product }: ProductCardProps) {
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
 
+  // Helper function to get color hex value
+  const getColorHex = (color: any): string => {
+    if (typeof color === 'string') {
+      return color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase();
+    } else if (color && typeof color === 'object' && color.hex) {
+      return color.hex;
+    }
+    return '#000000';
+  };
+
+  // Helper function to get color title
+  const getColorTitle = (color: any): string => {
+    if (typeof color === 'string') {
+      return color;
+    } else if (color && typeof color === 'object') {
+      return color.name ? `${color.name} (${color.hex})` : color.hex;
+    }
+    return 'Color';
+  };
+
+  // Helper function to get first color for cart (backward compatible)
+  const getFirstColorForCart = (): string => {
+    const firstColor = product.colors[0];
+    if (typeof firstColor === 'string') {
+      return firstColor;
+    } else if (firstColor && typeof firstColor === 'object' && 'hex' in firstColor) {
+      return (firstColor as { hex: string }).hex;
+    }
+    return '#000000';
+  };
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -51,7 +82,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         price: product.price,
         image: product.image_url || '/placeholder-product.jpg',
         size: selectedSize,
-        color: product.colors[0],
+        color: getFirstColorForCart(),
         stock: product.stock,
       });
     }
@@ -106,14 +137,14 @@ export default function ProductCard({ product }: ProductCardProps) {
 
       {/* Colors */}
       <div className="flex items-center gap-2 mb-3">
-        {product.colors.slice(0, 5).map((color) => (
+        {product.colors.slice(0, 5).map((color, idx) => (
           <div
-            key={color}
+            key={idx}
             className="w-5 h-5 rounded-full border-2 border-gray-300"
             style={{
-              backgroundColor: color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase()
+              backgroundColor: getColorHex(color)
             }}
-            title={color}
+            title={getColorTitle(color)}
           />
         ))}
         {product.colors.length > 5 && (

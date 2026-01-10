@@ -1,6 +1,7 @@
-// lib/supabase-orders.ts
+// lib/supabase-orders.ts - UPDATED WITH INVENTORY MANAGEMENT
 
 import { supabase } from './supabase';
+import { validateStock, updateProductStock, restoreProductStock } from './inventory';
 
 // Types
 export interface Address {
@@ -76,12 +77,11 @@ export async function getDefaultAddress(userId: string) {
     .eq('is_default', true)
     .single();
 
-  if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
+  if (error && error.code !== 'PGRST116') throw error;
   return data as Address | null;
 }
 
 export async function createAddress(address: Omit<Address, 'id' | 'created_at' | 'updated_at'>) {
-  // If this is set as default, unset all other defaults for this user
   if (address.is_default) {
     await supabase
       .from('addresses')
@@ -129,16 +129,14 @@ export async function deleteAddress(id: string) {
 
 // ========== ORDER FUNCTIONS ==========
 
-
-// In-memory rate limit for order creation (per user)
 const orderCreationLimits = new Map<string, { count: number; resetTime: number }>();
 
 function checkOrderCreationLimit(userId: string): { allowed: boolean; message?: string } {
   const now = Date.now();
   const userLimit = orderCreationLimits.get(userId);
   
-  const LIMIT = 3; // 3 orders
-  const WINDOW = 10 * 60 * 1000; // per 10 minutes
+  const LIMIT = 3;
+  const WINDOW = 10 * 60 * 1000;
 
   if (!userLimit || userLimit.resetTime < now) {
     orderCreationLimits.set(userId, {
@@ -160,7 +158,7 @@ function checkOrderCreationLimit(userId: string): { allowed: boolean; message?: 
   return { allowed: true };
 }
 
-// UPDATE your createOrder function
+// ✅ UPDATED: Create order with automatic inventory update
 export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'created_at' | 'updated_at'>) {
   // Check rate limit
   const rateLimitCheck = checkOrderCreationLimit(order.user_id);
@@ -192,7 +190,23 @@ export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'cr
     }
   }
 
-  // Create order
+  // ✅ STEP 1: Validate stock availability
+  console.log('📦 Validating stock availability...');
+  const stockValidation = await validateStock(
+    order.items.map(item => ({
+      product_id: item.product_id,
+      quantity: item.quantity,
+      size: item.size,
+      color: item.color
+    }))
+  );
+
+  if (!stockValidation.valid) {
+    throw new Error(`Stock validation failed: ${stockValidation.errors.join(', ')}`);
+  }
+
+  // ✅ STEP 2: Create order in database
+  console.log('📝 Creating order in database...');
   const { data, error } = await supabase
     .from('orders')
     .insert(order)
@@ -204,9 +218,29 @@ export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'cr
     throw new Error(error.message || 'Failed to create order');
   }
 
+  // ✅ STEP 3: Update product stock
+  console.log('📉 Updating product inventory...');
+  const stockUpdate = await updateProductStock(
+    order.items.map(item => ({
+      product_id: item.product_id,
+      quantity: item.quantity,
+      size: item.size,
+      color: item.color
+    }))
+  );
+
+  if (!stockUpdate.success) {
+    console.error('❌ Stock update failed:', stockUpdate.errors);
+    
+    // Rollback: Delete the order if stock update failed
+    await supabase.from('orders').delete().eq('id', data.id);
+    
+    throw new Error(`Order created but stock update failed: ${stockUpdate.errors.join(', ')}. Order has been cancelled.`);
+  }
+
+  console.log('✅ Order created successfully with inventory updated:', data.id);
   return data as Order;
 }
-
 
 export async function getOrders(userId: string) {
   const { data, error } = await supabase
@@ -274,6 +308,26 @@ export async function updateOrderStatus(orderId: string, status: Order['order_st
   return data as Order;
 }
 
+// ✅ UPDATED: Cancel order and restore stock
 export async function cancelOrder(orderId: string) {
+  // Get order details
+  const order = await getOrderById(orderId);
+  
+  // Restore stock
+  console.log('📈 Restoring product inventory...');
+  const stockRestore = await restoreProductStock(
+    order.items.map(item => ({
+      product_id: item.product_id,
+      quantity: item.quantity,
+      size: item.size,
+      color: item.color
+    }))
+  );
+
+  if (!stockRestore.success) {
+    console.error('⚠️ Stock restore had errors:', stockRestore.errors);
+  }
+
+  // Update order status
   return updateOrderStatus(orderId, 'cancelled');
 }

@@ -45,6 +45,28 @@ export default function TrendingCategories() {
     }
   };
 
+  // Helper function to get color hex value
+  const getColorHex = (color: any): string => {
+    if (typeof color === 'string') {
+      // Old format: string color
+      return color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase();
+    } else if (color && typeof color === 'object' && color.hex) {
+      // New format: {name, hex}
+      return color.hex;
+    }
+    return '#000000'; // fallback
+  };
+
+  // Helper function to get color title
+  const getColorTitle = (color: any): string => {
+    if (typeof color === 'string') {
+      return color;
+    } else if (color && typeof color === 'object') {
+      return color.name ? `${color.name} (${color.hex})` : color.hex;
+    }
+    return 'Color';
+  };
+
   if (loading) {
     return (
       <section className="py-12 md:py-32 px-4 sm:px-6 lg:px-8 bg-[#E3D9C6]">
@@ -58,8 +80,8 @@ export default function TrendingCategories() {
           <div className="md:hidden">
             <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
               {[1, 2].map((i) => (
-                <div key={i} className="flex-shrink-0 w-[90vw] snap-start animate-pulse">
-                  <div className="bg-gray-200 aspect-[3/4] mb-4"></div>
+                <div key={i} className="shrink-0 w-[90vw] snap-start animate-pulse">
+                  <div className="bg-gray-200 aspect-3/4 mb-4"></div>
                   <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
                   <div className="h-4 bg-gray-200 rounded w-1/2"></div>
                 </div>
@@ -71,7 +93,7 @@ export default function TrendingCategories() {
           <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="animate-pulse">
-                <div className="bg-gray-200 aspect-[3/4] mb-6"></div>
+                <div className="bg-gray-200 aspect-3/4 mb-6"></div>
                 <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
                 <div className="h-4 bg-gray-200 rounded w-1/2"></div>
               </div>
@@ -117,10 +139,10 @@ export default function TrendingCategories() {
               <Link 
                 key={product.id} 
                 href={`/products/${product.slug}`}
-                className="flex-shrink-0 w-[90vw] snap-start"
+                className="shrink-0 w-[90vw] snap-start"
               >
                 <div className="group cursor-pointer">
-                  <div className="relative overflow-hidden bg-gray-100 aspect-[3/4] flex items-center justify-center">
+                  <div className="relative overflow-hidden bg-gray-100 aspect-3/4 flex items-center justify-center">
                     <img
                       src={product.image_url || "/placeholder.svg"}
                       alt={product.name}
@@ -176,9 +198,9 @@ export default function TrendingCategories() {
                           key={idx}
                           className="w-4 h-4 rounded-full border border-gray-300"
                           style={{
-                            backgroundColor: color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase()
+                            backgroundColor: getColorHex(color)
                           }}
-                          title={color}
+                          title={getColorTitle(color)}
                         />
                       ))}
                       {product.colors.length > 4 && (
@@ -217,7 +239,7 @@ export default function TrendingCategories() {
           {products.map((product) => (
             <Link key={product.id} href={`/products/${product.slug}`}>
               <div className="group cursor-pointer">
-                <div className="relative overflow-hidden bg-gray-100 aspect-[3/4] flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
+                <div className="relative overflow-hidden bg-gray-100 aspect-3/4 flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
                   <img
                     src={product.image_url || "/placeholder.svg"}
                     alt={product.name}
@@ -259,9 +281,9 @@ export default function TrendingCategories() {
                         key={idx}
                         className="w-4 h-4 rounded-full border border-gray-300"
                         style={{
-                          backgroundColor: color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase()
+                          backgroundColor: getColorHex(color)
                         }}
-                        title={color}
+                        title={getColorTitle(color)}
                       />
                     ))}
                     {product.colors.length > 4 && (

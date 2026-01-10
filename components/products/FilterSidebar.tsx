@@ -8,10 +8,20 @@ import { X } from 'lucide-react';
 interface FilterSidebarProps {
   filters: FilterState;
   onChange: (filters: FilterState) => void;
-  availableColors: string[];
+  availableColors: (string | { name: string; hex: string })[];
   priceRange: [number, number];
   onReset: () => void;
 }
+
+// Helper function to get color hex value
+const getColorHex = (color: any): string => {
+  if (typeof color === 'string') {
+    return color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase();
+  } else if (color && typeof color === 'object' && color.hex) {
+    return color.hex;
+  }
+  return '#000000';
+};
 
 export default function FilterSidebar({
   filters,
@@ -42,10 +52,11 @@ export default function FilterSidebar({
     onChange({ ...filters, sizes: newSizes });
   };
 
-  const handleColorChange = (color: string) => {
-    const newColors = filters.colors.includes(color)
-      ? filters.colors.filter(c => c !== color)
-      : [...filters.colors, color];
+  const handleColorChange = (color: any) => {
+    const colorValue = typeof color === 'string' ? color : color.name || color.hex;
+    const newColors = filters.colors.includes(colorValue)
+      ? filters.colors.filter(c => c !== colorValue)
+      : [...filters.colors, colorValue];
     onChange({ ...filters, colors: newColors });
   };
 
@@ -169,24 +180,27 @@ export default function FilterSidebar({
       <div className="border-b pb-6">
         <h3 className="font-medium mb-3">Colors</h3>
         <div className="flex flex-wrap gap-2">
-          {availableColors.map(color => (
-            <button
-              key={color}
-              onClick={() => handleColorChange(color)}
-              className={`flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md transition-colors ${filters.colors.includes(color)
-                ? 'bg-gray-900 text-white border-gray-900'
-                : 'bg-[#E3D9C6] text-gray-900 border-gray-300 hover:border-gray-900'
-                }`}
-            >
-              <div
-                className="w-4 h-4 rounded-full border border-gray-300"
-                style={{
-                  backgroundColor: color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase()
-                }}
-              />
-              {color}
-            </button>
-          ))}
+          {availableColors.map(color => {
+            const colorValue = typeof color === 'string' ? color : color.name || color.hex;
+            const colorHex = getColorHex(color);
+            
+            return (
+              <button
+                key={colorValue}
+                onClick={() => handleColorChange(color)}
+                className={`flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md transition-colors ${filters.colors.includes(colorValue)
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-[#E3D9C6] text-gray-900 border-gray-300 hover:border-gray-900'
+                  }`}
+              >
+                <div
+                  className="w-4 h-4 rounded-full border border-gray-300"
+                  style={{ backgroundColor: colorHex }}
+                />
+                {colorValue}
+              </button>
+            );
+          })}
         </div>
       </div>
 

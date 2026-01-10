@@ -3,6 +3,7 @@
 import { Navbar } from "@/components/navbar"
 import { useCart } from "@/context/cart-context"
 import { formatPrice } from "@/utils/helpers"
+import { Minus, Plus } from "lucide-react"
 import Link from "next/link"
 
 export default function CartPage() {
@@ -49,6 +50,7 @@ export default function CartPage() {
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg">{item.name}</h3>
                     <p className="text-sm text-muted-foreground">Size: {item.size}</p>
+                    <p className="text-sm text-muted-foreground">color: {item.color}</p>
                     <p className="text-lg font-bold text-primary mt-2">{formatPrice(item.price)}</p>
                   </div>
                   <div className="flex flex-col items-end gap-4">
@@ -57,14 +59,14 @@ export default function CartPage() {
                         onClick={() => updateQuantity(item.id, item.size, item.quantity - 1)}
                         className="w-8 h-8 rounded-lg bg-muted hover:bg-muted/80 flex items-center justify-center"
                       >
-                        −
+                        <Minus/>
                       </button>
                       <span className="w-8 text-center font-medium">{item.quantity}</span>
                       <button
                         onClick={() => updateQuantity(item.id, item.size, item.quantity + 1)}
                         className="w-8 h-8 rounded-lg bg-muted hover:bg-muted/80 flex items-center justify-center"
                       >
-                        +
+                        <Plus/>
                       </button>
                     </div>
                     <button

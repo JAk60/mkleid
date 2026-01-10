@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { Plus, Edit, Trash2, X, Save, Search, Upload, Image as ImageIcon } from "lucide-react";
 
+interface ColorOption {
+  name: string;
+  hex: string;
+}
+
 interface Product {
   id?: number;
   name: string;
@@ -9,7 +14,7 @@ interface Product {
   image_url: string;
   category: string;
   sizes: string[];
-  colors: string[];
+  colors: ColorOption[];
   stock: number;
   gender: "Male" | "Female";
 }
@@ -29,6 +34,25 @@ const CATEGORIES = {
 
 const SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
 
+// Common color presets
+const COLOR_PRESETS = [
+  { name: 'Black', hex: '#000000' },
+  { name: 'White', hex: '#FFFFFF' },
+  { name: 'Red', hex: '#EF4444' },
+  { name: 'Blue', hex: '#3B82F6' },
+  { name: 'Green', hex: '#10B981' },
+  { name: 'Yellow', hex: '#F59E0B' },
+  { name: 'Purple', hex: '#8B5CF6' },
+  { name: 'Pink', hex: '#EC4899' },
+  { name: 'Gray', hex: '#6B7280' },
+  { name: 'Navy', hex: '#1E3A8A' },
+  { name: 'Maroon', hex: '#991B1B' },
+  { name: 'Teal', hex: '#14B8A6' },
+  { name: 'Orange', hex: '#F97316' },
+  { name: 'Beige', hex: '#D4B5A0' },
+  { name: 'Brown', hex: '#78350F' },
+];
+
 export default function ProductsManagement() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +63,9 @@ export default function ProductsManagement() {
   const [filterCategory, setFilterCategory] = useState("all");
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [colorInput, setColorInput] = useState("");
+  const [colorNameInput, setColorNameInput] = useState("");
+  const [colorHexInput, setColorHexInput] = useState("");
+  const [showPresets, setShowPresets] = useState(false);
   const [cloudinaryLoaded, setCloudinaryLoaded] = useState(false);
 
   // PAGINATION
@@ -116,14 +142,18 @@ export default function ProductsManagement() {
         gender: "Male",
       });
     }
-    setColorInput("");
+    setColorNameInput("");
+    setColorHexInput("");
+    setShowPresets(false);
     setShowModal(true);
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingProduct(null);
-    setColorInput("");
+    setColorNameInput("");
+    setColorHexInput("");
+    setShowPresets(false);
   };
 
   const handleCloudinaryUpload = () => {
@@ -132,7 +162,6 @@ export default function ProductsManagement() {
       return;
     }
 
-    // Check if env variables are set
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
@@ -153,7 +182,7 @@ export default function ProductsManagement() {
         folder: "products",
         multiple: false,
         maxFiles: 1,
-        maxFileSize: 2000000, // 2MB
+        maxFileSize: 2000000,
         clientAllowedFormats: ["png", "jpg", "jpeg", "webp"],
         resourceType: "image",
         cropping: true,
@@ -219,39 +248,54 @@ export default function ProductsManagement() {
     widget.open();
   };
 
-  const handleAddColor = () => {
-    if (!colorInput.trim()) return;
-    let color = colorInput.trim();
+  const addPresetColor = (preset: ColorOption) => {
+    if (formData.colors.some(c => c.hex === preset.hex)) {
+      alert("This color is already added");
+      return;
+    }
+    setFormData((prev) => ({
+      ...prev,
+      colors: [...prev.colors, preset],
+    }));
+  };
 
-    if (!color.startsWith("#")) color = "#" + color;
+  const handleAddCustomColor = () => {
+    if (!colorNameInput.trim() || !colorHexInput.trim()) {
+      alert("Please enter both color name and hex code");
+      return;
+    }
+
+    let hex = colorHexInput.trim();
+    if (!hex.startsWith("#")) hex = "#" + hex;
 
     const regex = /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/;
-    if (!regex.test(color)) {
+    if (!regex.test(hex)) {
       alert("Invalid hex color. Use format: #FF0000 or FF0000");
       return;
     }
 
-    if (color.length === 4) {
-      color = "#" + color[1] + color[1] + color[2] + color[2] + color[3] + color[3];
+    if (hex.length === 4) {
+      hex = "#" + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
     }
 
-    if (formData.colors.includes(color.toUpperCase())) {
+    if (formData.colors.some(c => c.hex === hex.toUpperCase())) {
       alert("This color is already added");
       return;
     }
 
     setFormData((prev) => ({
       ...prev,
-      colors: [...prev.colors, color.toUpperCase()],
+      colors: [...prev.colors, { name: colorNameInput.trim(), hex: hex.toUpperCase() }],
     }));
 
-    setColorInput("");
+    setColorNameInput("");
+    setColorHexInput("");
   };
 
-  const removeColor = (c: string) => {
+  const removeColor = (hex: string) => {
     setFormData((prev) => ({
       ...prev,
-      colors: prev.colors.filter((x) => x !== c),
+      colors: prev.colors.filter((x) => x.hex !== hex),
     }));
   };
 
@@ -513,17 +557,19 @@ export default function ProductsManagement() {
                   <span className="text-sm text-gray-500">
                     Sizes: {product.sizes.join(", ")}
                   </span>
-                  <div className="flex gap-1">
+                  <div className="flex gap-2 items-center">
                     {product.colors.slice(0, 5).map((color, i) => (
-                      <div
-                        key={i}
-                        className="w-6 h-6 rounded-full border-2 border-gray-300"
-                        style={{ backgroundColor: color }}
-                        title={color}
-                      />
+                      <div key={i} className="flex flex-col items-center">
+                        <div
+                          className="w-8 h-8 rounded-full border-2 border-gray-300"
+                          style={{ backgroundColor: color.hex }}
+                          title={`${color.name} (${color.hex})`}
+                        />
+                        <span className="text-xs text-gray-600 mt-1">{color.name}</span>
+                      </div>
                     ))}
                     {product.colors.length > 5 && (
-                      <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs">
+                      <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs">
                         +{product.colors.length - 5}
                       </div>
                     )}
@@ -770,45 +816,112 @@ export default function ProductsManagement() {
 
               {/* COLORS */}
               <div>
-                <label className="block font-medium mb-2">Colors (Hex) *</label>
-                <div className="flex gap-2">
-                  <input
-                    value={colorInput}
-                    onChange={(e) => setColorInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddColor()}
-                    className="border px-4 py-2 rounded-lg flex-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter hex color (e.g., #FF5733 or FF5733)"
-                  />
+                <label className="block font-medium mb-2">Colors *</label>
+                
+                {/* Quick Presets */}
+                <div className="mb-4">
                   <button
                     type="button"
-                    onClick={handleAddColor}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                    onClick={() => setShowPresets(!showPresets)}
+                    className="text-sm text-blue-600 hover:text-blue-700 mb-2"
+                  >
+                    {showPresets ? '▼ Hide' : '▶ Show'} Quick Color Presets
+                  </button>
+                  
+                  {showPresets && (
+                    <div className="grid grid-cols-5 gap-2 p-3 bg-gray-50 rounded-lg border">
+                      {COLOR_PRESETS.map((preset) => (
+                        <button
+                          key={preset.hex}
+                          type="button"
+                          onClick={() => addPresetColor(preset)}
+                          disabled={formData.colors.some(c => c.hex === preset.hex)}
+                          className="flex flex-col items-center gap-1 p-2 rounded hover:bg-white transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <div
+                            className="w-10 h-10 rounded-full border-2 border-gray-300"
+                            style={{ backgroundColor: preset.hex }}
+                          />
+                          <span className="text-xs font-medium text-gray-700">
+                            {preset.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Custom Color Input */}
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    value={colorNameInput}
+                    onChange={(e) => setColorNameInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddCustomColor()}
+                    className="flex-1 border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Color name (e.g., Sky Blue)"
+                  />
+                  <input
+                    value={colorHexInput}
+                    onChange={(e) => setColorHexInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddCustomColor()}
+                    className="w-32 border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                    placeholder="#FF5733"
+                  />
+                  {colorHexInput && (
+                    <div
+                      className="w-12 h-12 rounded-lg border-2 border-gray-300 flex-shrink-0"
+                      style={{ 
+                        backgroundColor: colorHexInput.startsWith('#') 
+                          ? colorHexInput 
+                          : '#' + colorHexInput 
+                      }}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleAddCustomColor}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
                   >
                     Add
                   </button>
                 </div>
 
+                {/* Selected Colors */}
                 {formData.colors.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {formData.colors.map((c) => (
+                  <div className="grid grid-cols-2 gap-3">
+                    {formData.colors.map((color) => (
                       <div
-                        key={c}
-                        className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg hover:bg-gray-200 transition"
+                        key={color.hex}
+                        className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition border"
                       >
                         <div
-                          className="w-6 h-6 rounded-full border-2 border-gray-300"
-                          style={{ backgroundColor: c }}
+                          className="w-10 h-10 rounded-lg border-2 border-gray-300 flex-shrink-0"
+                          style={{ backgroundColor: color.hex }}
                         />
-                        <span className="font-mono text-sm">{c}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-gray-900 text-sm truncate">
+                            {color.name}
+                          </div>
+                          <div className="text-xs text-gray-500 font-mono">
+                            {color.hex}
+                          </div>
+                        </div>
                         <button
                           type="button"
-                          onClick={() => removeColor(c)}
-                          className="text-red-500 hover:text-red-700 transition"
+                          onClick={() => removeColor(color.hex)}
+                          className="p-1.5 text-red-500 hover:bg-red-50 rounded transition flex-shrink-0"
                         >
                           <X size={16} />
                         </button>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {formData.colors.length === 0 && (
+                  <div className="text-center py-6 text-gray-400 border-2 border-dashed rounded-lg">
+                    No colors added yet. Use presets or add custom colors.
                   </div>
                 )}
               </div>
