@@ -83,11 +83,11 @@ export default function Home() {
         </AnimateOnScroll>
 
         {/* Reviews Section - Animated */}
-        <AnimateOnScroll delay={0.2}>
+        {/* <AnimateOnScroll delay={0.2}>
           <section className="bg-[#E3D9C6] py-12 md:py-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
             <AnimatedTestimonials />
           </section>
-        </AnimateOnScroll>
+        </AnimateOnScroll> */}
       </main>
     </>
   )

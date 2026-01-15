@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff, GripVertical, Save, X } from 'lucide-react';
 
 interface Category {
-  id: number;
+  id: string; // ✅ Changed from number to string (UUID)
   name: string;
   slug: string;
   gender: 'Male' | 'Female' | 'Unisex';
@@ -39,9 +39,15 @@ export default function CategoryManagement() {
       setLoading(true);
       const response = await fetch('/api/admin/categories');
       const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch categories');
+      }
+      
       setCategories(data.data || []);
     } catch (error) {
       console.error('Failed to load categories:', error);
+      alert('Failed to load categories: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -50,7 +56,15 @@ export default function CategoryManagement() {
   const handleOpenModal = (category: Category | null = null) => {
     if (category) {
       setEditingCategory(category);
-      setFormData(category);
+      setFormData({
+        name: category.name,
+        slug: category.slug,
+        gender: category.gender,
+        description: category.description || '',
+        image_url: category.image_url || '',
+        display_order: category.display_order,
+        is_active: category.is_active,
+      });
     } else {
       setEditingCategory(null);
       setFormData({
@@ -78,7 +92,7 @@ export default function CategoryManagement() {
       .replace(/^-+|-+$/g, '');
   };
 
-  const handleNameChange = (e) => {
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value;
     setFormData({
       ...formData,
@@ -95,26 +109,34 @@ export default function CategoryManagement() {
 
     try {
       const method = editingCategory ? 'PUT' : 'POST';
+      const body = editingCategory 
+        ? { id: editingCategory.id, ...formData } 
+        : formData;
+
+      console.log('Submitting:', { method, body });
+
       const response = await fetch('/api/admin/categories', {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          editingCategory ? { id: editingCategory.id, ...formData } : formData
-        ),
+        body: JSON.stringify(body),
       });
 
       const data = await response.json();
-      if (!data.success) throw new Error(data.error);
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Operation failed');
+      }
 
       alert(editingCategory ? 'Category updated!' : 'Category created!');
       await fetchCategories();
       handleCloseModal();
     } catch (error) {
+      console.error('Submit error:', error);
       alert(error instanceof Error ? error.message : 'An error occurred');
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Delete this category? Products using it will need reassignment.')) return;
 
     try {
@@ -314,7 +336,7 @@ export default function CategoryManagement() {
                 <label className="block font-medium mb-1">Gender *</label>
                 <select
                   value={formData.gender}
-                  onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, gender: e.target.value as 'Male' | 'Female' | 'Unisex' })}
                   className="w-full border px-4 py-2 rounded-lg"
                 >
                   <option value="Male">Male</option>

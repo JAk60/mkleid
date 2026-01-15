@@ -1,4 +1,4 @@
-// components/header/index.tsx - MATCHING YOUR DESIGN
+// components/header/index.tsx - DYNAMIC CATEGORIES
 
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
@@ -15,6 +15,13 @@ import { BiMenuAltRight } from "react-icons/bi";
 import { VscChromeClose } from "react-icons/vsc";
 import { IoPersonOutline, IoSearchOutline } from "react-icons/io5";
 
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  gender: 'Male' | 'Female' | 'Unisex';
+}
+
 const Header = () => {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [showMenCat, setShowMenCat] = useState(false);
@@ -22,27 +29,58 @@ const Header = () => {
   const [show, setShow] = useState("translate-y-0");
   const [lastScrollY, setLastScrollY] = useState(0);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  
+  // Dynamic categories state
+  const [menCategories, setMenCategories] = useState<Array<{ id: string; name: string; url: string }>>([]);
+  const [womenCategories, setWomenCategories] = useState<Array<{ id: string; name: string; url: string }>>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
 
   const { itemCount } = useCart();
   const { user, isLoggedIn, logout } = useAuth();
 
-  const subMenuMenData = [
-    { id: "m1", name: "Oversized T-Shirts", url: "/products/gender/Male/mens-oversized-tshirt" },
-    { id: "m2", name: "Jersey", url: "/products/gender/Male/mens-jersey" },
-    { id: "m3", name: "Sweatshirts", url: "/products/gender/Male/mens-sweatshirt" },
-    { id: "m4", name: "Shirts", url: "/products/gender/Male/mens-shirts" },
-    { id: "m5", name: "Sweatpants", url: "/products/gender/Male/mens-sweatpants" },
-  ];
+  // Fetch categories from API
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+        
+        // Fetch Male categories
+        const menResponse = await fetch('/api/categories?gender=Male');
+        const menData = await menResponse.json();
+        
+        // Fetch Female categories
+        const womenResponse = await fetch('/api/categories?gender=Female');
+        const womenData = await womenResponse.json();
 
-  const subMenuWomenData = [
-    { id: "w1", name: "Baby Tees", url: "/products/gender/Female/womens-baby-tees" },
-    { id: "w2", name: "Jersey", url: "/products/gender/Female/womens-jersey" },
-    { id: "w3", name: "Oversized T-Shirts", url: "/products/gender/Female/womens-oversized-tshirt" },
-    { id: "w4", name: "Shirts", url: "/products/gender/Female/womens-shirts" },
-    { id: "w5", name: "Sweatshirts", url: "/products/gender/Female/womens-sweatshirt" },
-    { id: "w6", name: "Sweatpants", url: "/products/gender/Female/womens-sweatpants" },
-    { id: "w7", name: "Flared Pants", url: "/products/gender/Female/womens-flared-pants" },
-  ];
+        if (menData.success) {
+          const formattedMen = menData.data.map((cat: Category) => ({
+            id: cat.id,
+            name: cat.name,
+            url: `/products/gender/Male/${cat.slug}`,
+          }));
+          setMenCategories(formattedMen);
+        }
+
+        if (womenData.success) {
+          const formattedWomen = womenData.data.map((cat: Category) => ({
+            id: cat.id,
+            name: cat.name,
+            url: `/products/gender/Female/${cat.slug}`,
+          }));
+          setWomenCategories(formattedWomen);
+        }
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+        // Fallback to empty arrays on error
+        setMenCategories([]);
+        setWomenCategories([]);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   const controlNavbar = useCallback(() => {
     if (window.scrollY > 200) {
@@ -115,30 +153,32 @@ const Header = () => {
           <img
             src="/mk.png"
             alt="Maagnus Kleid"
-            className="h-120 mt-6 md:h-100  w-auto object-contain"
+            className="h-120 mt-6 md:h-100 w-auto object-contain"
           />
         </Link>
 
         {/* Desktop Menu */}
-        <Menu
-          showMenCat={showMenCat}
-          setShowMenCat={setShowMenCat}
-          showWomenCat={showWomenCat}
-          setShowWomenCat={setShowWomenCat}
-          subMenuMenData={subMenuMenData}
-          subMenuWomenData={subMenuWomenData}
-        />
+        {!categoriesLoading && (
+          <Menu
+            showMenCat={showMenCat}
+            setShowMenCat={setShowMenCat}
+            showWomenCat={showWomenCat}
+            setShowWomenCat={setShowWomenCat}
+            subMenuMenData={menCategories}
+            subMenuWomenData={womenCategories}
+          />
+        )}
 
         {/* Mobile Menu Overlay */}
-        {mobileMenu && (
+        {mobileMenu && !categoriesLoading && (
           <MenuMobile
             showMenCat={showMenCat}
             setShowMenCat={setShowMenCat}
             showWomenCat={showWomenCat}
             setShowWomenCat={setShowWomenCat}
             setMobileMenu={setMobileMenu}
-            subMenuMenData={subMenuMenData}
-            subMenuWomenData={subMenuWomenData}
+            subMenuMenData={menCategories}
+            subMenuWomenData={womenCategories}
           />
         )}
 

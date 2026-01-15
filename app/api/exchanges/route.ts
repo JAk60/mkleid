@@ -1,8 +1,8 @@
-// app/api/exchanges/route.ts - FIXED WITH DUPLICATE PREVENTION
+// app/api/exchanges/route.ts - SIMPLIFIED FOR SIZE/COLOR ONLY
+
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { getProducts } from '@/lib/supabase';
 
 // ==========================================
 // TYPES
@@ -20,71 +20,8 @@ interface ExchangeItem {
   current_price?: number;
 }
 
-type SettlementType = 'NO_CHARGE' | 'COLLECT_PAYMENT' | 'ISSUE_REFUND';
-type SettlementStatus = 'PENDING' | 'PAYMENT_REQUIRED' | 'PAYMENT_COLLECTED' | 'REFUND_PENDING' | 'REFUND_ISSUED' | 'COMPLETED';
-
-interface PricingCalculation {
-  originalTotal: number;
-  replacementTotal: number;
-  difference: number;
-  settlementType: SettlementType;
-  tax: number;
-  finalDifference: number;
-}
-
 // ==========================================
-// PRICE CALCULATION (BACKEND AUTHORITY)
-// ==========================================
-
-async function calculateSettlement(
-  originalItems: ExchangeItem[],
-  requestedItems: ExchangeItem[]
-): Promise<PricingCalculation> {
-  
-  const products = await getProducts();
-  const productMap = new Map(products.map(p => [p.id, p]));
-
-  const originalTotal = originalItems.reduce(
-    (sum, item) => sum + (item.original_price * item.quantity),
-    0
-  );
-
-  let replacementTotal = 0;
-  
-  for (const item of requestedItems) {
-    const product = productMap.get(item.product_id);
-    if (!product) {
-      throw new Error(`Product ${item.product_id} not found or unavailable`);
-    }
-    replacementTotal += product.price * item.quantity;
-  }
-
-  const difference = replacementTotal - originalTotal;
-  const tax = Math.round(Math.abs(difference) * 0.18);
-  const finalDifference = difference + (difference > 0 ? tax : -tax);
-
-  let settlementType: SettlementType;
-  
-  if (Math.abs(finalDifference) < 1) {
-    settlementType = 'NO_CHARGE';
-  } else if (finalDifference > 0) {
-    settlementType = 'COLLECT_PAYMENT';
-  } else {
-    settlementType = 'ISSUE_REFUND';
-  }
-
-  return {
-    originalTotal,
-    replacementTotal,
-    difference,
-    settlementType,
-    tax,
-    finalDifference
-  };
-}
-
-// ==========================================
-// ELIGIBILITY CHECK - WITH DUPLICATE PREVENTION
+// ELIGIBILITY CHECK
 // ==========================================
 
 async function checkEligibility(orderId: string, userId: string) {
@@ -100,26 +37,22 @@ async function checkEligibility(orderId: string, userId: string) {
     return { eligible: false, reason: 'Order not found' };
   }
 
-  // ✅ CRITICAL: Check for active exchanges FIRST
+  // ✅ Check for active exchanges
   const { data: activeExchanges } = await supabase
     .from('exchange_requests')
     .select('id, status, created_at')
     .eq('order_id', orderId)
-    .in('status', ['pending', 'awaiting_payment', 'approved', 'processing', 'shipped']);
+    .in('status', ['pending', 'approved', 'processing', 'shipped']);
 
   if (activeExchanges && activeExchanges.length > 0) {
     const exchange = activeExchanges[0];
-    
     const statusMessages: Record<string, string> = {
       'pending': 'pending admin review',
-      'awaiting_payment': 'awaiting your payment',
       'approved': 'approved and ready to ship',
       'processing': 'being processed',
       'shipped': 'already shipped'
     };
-
     const statusText = statusMessages[exchange.status] || exchange.status;
-
     return { 
       eligible: false, 
       reason: `An exchange request for this order is already ${statusText}. You cannot create multiple exchange requests for the same order.`,
@@ -158,53 +91,48 @@ async function checkEligibility(orderId: string, userId: string) {
 }
 
 // ==========================================
-// STOCK VALIDATION
+// VALIDATE SAME PRODUCT
 // ==========================================
 
-async function validateStock(requestedItems: ExchangeItem[]) {
-  const products = await getProducts();
-  const productMap = new Map(products.map(p => [p.id, p]));
+function validateSameProduct(originalItems: ExchangeItem[], requestedItems: ExchangeItem[]) {
+  if (originalItems.length !== requestedItems.length) {
+    return { valid: false, error: 'Item count mismatch' };
+  }
 
-  const errors: string[] = [];
+  for (let i = 0; i < originalItems.length; i++) {
+    const orig = originalItems[i];
+    const req = requestedItems[i];
 
-  for (const item of requestedItems) {
-    const product = productMap.get(item.product_id);
-    
-    if (!product) {
-      errors.push(`Product ${item.product_name} is no longer available`);
-      continue;
+    // Must be same product
+    if (orig.product_id !== req.product_id) {
+      return { 
+        valid: false, 
+        error: 'Product exchange not allowed. You can only change size or color of the same product.' 
+      };
     }
 
-    if (product.stock < item.quantity) {
-      errors.push(
-        `Insufficient stock for ${item.product_name}. ` +
-        `Available: ${product.stock}, Requested: ${item.quantity}`
-      );
+    // Must be same quantity
+    if (orig.quantity !== req.quantity) {
+      return { 
+        valid: false, 
+        error: 'Quantity cannot be changed. You can only change size or color.' 
+      };
     }
 
-    if (!product.sizes.includes(item.size)) {
-      errors.push(`Size ${item.size} not available for ${item.product_name}`);
-    }
-
-    if (!product.colors.includes(item.color)) {
-      errors.push(`Color ${item.color} not available for ${item.product_name}`);
+    // At least size OR color must be different
+    if (orig.size === req.size && orig.color === req.color) {
+      return { 
+        valid: false, 
+        error: 'Please select a different size or color to exchange.' 
+      };
     }
   }
 
-  return { isValid: errors.length === 0, errors };
+  return { valid: true };
 }
 
 // ==========================================
-// RESERVE STOCK
-// ==========================================
-
-async function reserveStock(exchangeId: string, items: ExchangeItem[]) {
-  console.log(`🔒 Stock reserved for exchange ${exchangeId}:`, items);
-  return { reserved: true };
-}
-
-// ==========================================
-// POST - CREATE EXCHANGE REQUEST (FIXED)
+// POST - CREATE EXCHANGE REQUEST
 // ==========================================
 
 export async function POST(request: Request) {
@@ -229,9 +157,17 @@ export async function POST(request: Request) {
       );
     }
 
+    // 2. Validate exchange type
+    if (!['size', 'color'].includes(exchange_type)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid exchange type. Only size and color exchanges are allowed.' },
+        { status: 400 }
+      );
+    }
+
     console.log('📝 Creating exchange request for user:', user_id);
 
-    // 2. Check eligibility (includes duplicate check)
+    // 3. Check eligibility
     const eligibility = await checkEligibility(order_id, user_id);
     if (!eligibility.eligible) {
       console.log('❌ Not eligible:', eligibility.reason);
@@ -245,54 +181,39 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Validate stock
-    const stockValidation = await validateStock(requested_items);
-    if (!stockValidation.isValid) {
+    // 4. Validate same product rule
+    const validation = validateSameProduct(original_items, requested_items);
+    if (!validation.valid) {
       return NextResponse.json(
-        { success: false, error: stockValidation.errors.join('; ') },
+        { success: false, error: validation.error },
         { status: 400 }
       );
     }
 
-    // 4. Calculate settlement (BACKEND AUTHORITY)
-    const pricing = await calculateSettlement(original_items, requested_items);
-
-    console.log('💰 Settlement Calculation:', pricing);
-
-    // 5. Determine initial status based on settlement type
-    let initialStatus = 'pending';
-    let settlementStatus: SettlementStatus = 'PENDING';
-
-    switch (pricing.settlementType) {
-      case 'NO_CHARGE':
-        initialStatus = 'pending';
-        settlementStatus = 'COMPLETED';
-        break;
-      
-      case 'COLLECT_PAYMENT':
-        initialStatus = 'awaiting_payment';
-        settlementStatus = 'PAYMENT_REQUIRED';
-        break;
-      
-      case 'ISSUE_REFUND':
-        initialStatus = 'pending';
-        settlementStatus = 'REFUND_PENDING';
-        break;
-    }
-
-    // 6. Get order number
+    // 5. Get order number
     const { data: order } = await supabase
       .from('orders')
       .select('order_number')
       .eq('id', order_id)
       .single();
 
+    // 6. Calculate totals (should be same for same product)
+    const originalTotal = original_items.reduce(
+      (sum: number, item: ExchangeItem) => sum + (item.original_price * item.quantity),
+      0
+    );
+
+    const requestedTotal = requested_items.reduce(
+      (sum: number, item: ExchangeItem) => sum + ((item.current_price || item.original_price) * item.quantity),
+      0
+    );
+
     // 7. ✅ DOUBLE-CHECK: No active exchange exists (race condition prevention)
     const { data: doubleCheck } = await supabaseAdmin
       .from('exchange_requests')
       .select('id, status')
       .eq('order_id', order_id)
-      .in('status', ['pending', 'awaiting_payment', 'approved', 'processing', 'shipped'])
+      .in('status', ['pending', 'approved', 'processing', 'shipped'])
       .maybeSingle();
 
     if (doubleCheck) {
@@ -303,7 +224,7 @@ export async function POST(request: Request) {
           error: 'An exchange request for this order already exists. Please refresh and try again.',
           existingExchangeId: doubleCheck.id
         },
-        { status: 409 } // 409 Conflict
+        { status: 409 }
       );
     }
 
@@ -317,14 +238,23 @@ export async function POST(request: Request) {
       exchange_type,
       reason,
       description: description || '',
-      original_total: pricing.originalTotal,
-      requested_total: pricing.replacementTotal,
-      price_difference: pricing.difference,
-      settlement_type: pricing.settlementType,
-      settlement_status: settlementStatus,
-      settlement_amount: Math.abs(pricing.finalDifference),
-      tax_amount: pricing.tax,
-      status: initialStatus
+      
+      // Pricing (should be zero for same product)
+      original_total: originalTotal,
+      requested_total: requestedTotal,
+      price_difference: 0,
+      tax_amount: 0,
+      settlement_amount: 0,
+      
+      // Settlement (always NO_CHARGE for same product)
+      settlement_type: 'NO_CHARGE',
+      settlement_status: 'COMPLETED',
+      
+      // Status
+      status: 'pending', // Awaiting admin approval
+      
+      // Same product flag
+      is_same_product: true
     };
 
     console.log('📤 Inserting exchange request...');
@@ -338,7 +268,6 @@ export async function POST(request: Request) {
     if (exchangeError) {
       console.error('Exchange creation error:', exchangeError);
       
-      // Check if it's a duplicate key error
       if (exchangeError.code === '23505') {
         return NextResponse.json(
           { 
@@ -354,43 +283,12 @@ export async function POST(request: Request) {
 
     console.log('✅ Exchange created:', exchange.id);
 
-    // 9. Reserve stock for replacement items
-    await reserveStock(exchange.id, requested_items);
-
-    // 10. Prepare response based on settlement type
-    const response: any = {
+    return NextResponse.json({
       success: true,
       data: exchange,
-      pricing,
-      nextAction: null
-    };
-
-    switch (pricing.settlementType) {
-      case 'NO_CHARGE':
-        response.message = 'Exchange request submitted! No additional payment required.';
-        response.nextAction = 'WAIT_APPROVAL';
-        break;
-      
-      case 'COLLECT_PAYMENT':
-        response.message = `Exchange request created. Payment of ₹${pricing.finalDifference.toFixed(2)} required.`;
-        response.nextAction = 'INITIATE_PAYMENT';
-        response.paymentDetails = {
-          amount: pricing.finalDifference,
-          description: `Exchange price difference for order ${order?.order_number}`
-        };
-        break;
-      
-      case 'ISSUE_REFUND':
-        response.message = 'Exchange request submitted! Refund will be processed after quality check.';
-        response.nextAction = 'WAIT_APPROVAL';
-        response.refundDetails = {
-          amount: Math.abs(pricing.finalDifference),
-          processingNote: 'Refund will be issued after item inspection'
-        };
-        break;
-    }
-
-    return NextResponse.json(response);
+      message: 'Exchange request submitted successfully! No additional payment required. Our team will review it shortly.',
+      nextAction: 'WAIT_APPROVAL'
+    });
 
   } catch (error: any) {
     console.error('❌ Exchange API Error:', error);
@@ -424,7 +322,6 @@ export async function GET(request: Request) {
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
-    // Optional: filter by specific order
     if (orderId) {
       query = query.eq('order_id', orderId);
     }
@@ -440,83 +337,6 @@ export async function GET(request: Request) {
 
   } catch (error: any) {
     console.error('❌ Get Exchanges Error:', error);
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    );
-  }
-}
-
-// ==========================================
-// PUT - UPDATE SETTLEMENT STATUS
-// ==========================================
-
-export async function PUT(request: Request) {
-  try {
-    const body = await request.json();
-    const { exchangeId, action, paymentDetails } = body;
-
-    if (!exchangeId || !action) {
-      return NextResponse.json(
-        { success: false, error: 'Exchange ID and action required' },
-        { status: 400 }
-      );
-    }
-
-    // Get exchange
-    const { data: exchange } = await supabase
-      .from('exchange_requests')
-      .select('*')
-      .eq('id', exchangeId)
-      .single();
-
-    if (!exchange) {
-      return NextResponse.json(
-        { success: false, error: 'Exchange not found' },
-        { status: 404 }
-      );
-    }
-
-    let updates: any = { updated_at: new Date().toISOString() };
-
-    switch (action) {
-      case 'CONFIRM_PAYMENT':
-        updates.settlement_status = 'PAYMENT_COLLECTED';
-        updates.payment_details = paymentDetails;
-        updates.status = 'pending';
-        updates.payment_collected_at = new Date().toISOString();
-        break;
-
-      case 'APPROVE_REFUND':
-        updates.settlement_status = 'REFUND_ISSUED';
-        updates.refund_details = paymentDetails;
-        updates.status = 'completed';
-        updates.refund_issued_at = new Date().toISOString();
-        break;
-
-      case 'COMPLETE':
-        updates.settlement_status = 'COMPLETED';
-        updates.status = 'completed';
-        updates.completed_at = new Date().toISOString();
-        break;
-    }
-
-    const { data: updated, error } = await supabaseAdmin
-      .from('exchange_requests')
-      .update(updates)
-      .eq('id', exchangeId)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return NextResponse.json({
-      success: true,
-      data: updated
-    });
-
-  } catch (error: any) {
-    console.error('❌ Update Settlement Error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

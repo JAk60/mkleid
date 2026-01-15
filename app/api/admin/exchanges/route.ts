@@ -1,9 +1,10 @@
-// app/api/admin/exchanges/route.ts - FIXED VERSION
+// app/api/admin/exchanges/route.ts - SIMPLIFIED (NO PAYMENT/REFUND)
+
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 // ==========================================
-// GET - FETCH ALL EXCHANGES (ADMIN) - FIXED
+// GET - FETCH ALL EXCHANGES (ADMIN)
 // ==========================================
 
 export async function GET(request: Request) {
@@ -12,12 +13,11 @@ export async function GET(request: Request) {
     const status = searchParams.get('status');
     const userId = searchParams.get('userId');
     const orderId = searchParams.get('orderId');
-    const settlementType = searchParams.get('settlementType');
     const limit = searchParams.get('limit');
 
-    console.log('📦 Admin: Fetching exchanges', { status, userId, orderId, settlementType });
+    console.log('📦 Admin: Fetching exchanges', { status, userId, orderId });
 
-    // STEP 1: Get exchanges first WITHOUT join
+    // Get exchanges
     let query = supabaseAdmin
       .from('exchange_requests')
       .select('*')
@@ -36,10 +36,6 @@ export async function GET(request: Request) {
       query = query.eq('order_id', orderId);
     }
 
-    if (settlementType && settlementType !== 'all') {
-      query = query.eq('settlement_type', settlementType);
-    }
-
     if (limit) {
       query = query.limit(parseInt(limit));
     }
@@ -54,50 +50,39 @@ export async function GET(request: Request) {
     console.log(`✅ Found ${exchanges?.length || 0} raw exchanges`);
 
     if (!exchanges || exchanges.length === 0) {
-      console.log('⚠️ No exchanges found in database');
       return NextResponse.json({
         success: true,
         data: []
       });
     }
 
-    // STEP 2: Manually enrich with order data
+    // Enrich with order data
     const enrichedExchanges = await Promise.all(
       exchanges.map(async (exchange) => {
         try {
-          // Get order data
-          const { data: order, error: orderError } = await supabaseAdmin
+          const { data: order } = await supabaseAdmin
             .from('orders')
             .select('order_number, user_id, shipping_address')
             .eq('id', exchange.order_id)
             .single();
 
-          if (orderError) {
-            console.warn(`⚠️ Could not fetch order for exchange ${exchange.id}:`, orderError.message);
-          }
-
-          // Extract customer info from shipping address
           const shippingAddress = order?.shipping_address || {};
           const customerName = `${shippingAddress.first_name || ''} ${shippingAddress.last_name || ''}`.trim() || 'N/A';
           const customerEmail = shippingAddress.email || 'N/A';
-          const customerPhone = shippingAddress.phone || 'N/A';
 
           return {
             ...exchange,
             order_number: order?.order_number || exchange.order_number || 'N/A',
             customer_name: customerName,
-            customer_email: customerEmail,
-            customer_phone: customerPhone
+            customer_email: customerEmail
           };
-        } catch (error: any) {
+        } catch (error) {
           console.error(`❌ Error enriching exchange ${exchange.id}:`, error);
-          // Return exchange with placeholder data if enrichment fails
           return {
             ...exchange,
             order_number: exchange.order_number || 'N/A',
             customer_name: 'N/A',
-            customer_email: 'N/A',
-            customer_phone: 'N/A'
+            customer_email: 'N/A'
           };
         }
       })
@@ -115,8 +100,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       { 
         success: false, 
-        error: error.message,
-        details: error.details || null
+        error: error.message
       },
       { status: 500 }
     );
@@ -133,11 +117,8 @@ export async function PUT(request: Request) {
     const { 
       id, 
       status, 
-      settlement_status,
       admin_notes, 
-      tracking_number, 
-      qc_notes,
-      qc_status,
+      tracking_number,
       rejection_reason
     } = body;
 
@@ -148,7 +129,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    console.log('✏️ Admin: Updating exchange', { id, status, settlement_status });
+    console.log('✏️ Admin: Updating exchange', { id, status });
 
     // Get current exchange
     const { data: currentExchange, error: fetchError } = await supabaseAdmin
@@ -165,12 +146,11 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Build updates object
+    // Build updates
     const updates: any = { 
       updated_at: new Date().toISOString() 
     };
 
-    // Status updates
     if (status) {
       updates.status = status;
 
@@ -192,33 +172,8 @@ export async function PUT(request: Request) {
       }
     }
 
-    // Settlement status updates
-    if (settlement_status) {
-      updates.settlement_status = settlement_status;
-
-      switch (settlement_status) {
-        case 'PAYMENT_COLLECTED':
-          updates.payment_collected_at = new Date().toISOString();
-          if (currentExchange.status === 'awaiting_payment') {
-            updates.status = 'approved';
-            updates.approved_at = new Date().toISOString();
-          }
-          break;
-        case 'REFUND_ISSUED':
-          updates.refund_issued_at = new Date().toISOString();
-          if (currentExchange.status === 'shipped') {
-            updates.status = 'completed';
-            updates.completed_at = new Date().toISOString();
-          }
-          break;
-      }
-    }
-
-    // Additional fields
     if (admin_notes) updates.admin_notes = admin_notes;
     if (tracking_number) updates.tracking_number = tracking_number;
-    if (qc_notes) updates.qc_notes = qc_notes;
-    if (qc_status) updates.qc_status = qc_status;
 
     // Validation
     if (status === 'rejected' && !rejection_reason && !admin_notes) {
@@ -253,7 +208,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({
       success: true,
       data: updated,
-      message: getSuccessMessage(status, settlement_status)
+      message: getSuccessMessage(status)
     });
 
   } catch (error: any) {
@@ -297,7 +252,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    if (!['pending', 'awaiting_payment'].includes(exchange.status)) {
+    if (!['pending', 'approved'].includes(exchange.status)) {
       return NextResponse.json(
         { success: false, error: `Cannot cancel exchange with status: ${exchange.status}` },
         { status: 400 }
@@ -337,32 +292,19 @@ export async function DELETE(request: Request) {
 // HELPER FUNCTIONS
 // ==========================================
 
-function getSuccessMessage(status?: string, settlementStatus?: string): string {
-  if (settlementStatus) {
-    switch (settlementStatus) {
-      case 'PAYMENT_COLLECTED':
-        return 'Payment confirmed. Exchange approved and ready for processing.';
-      case 'REFUND_ISSUED':
-        return 'Refund issued successfully. Exchange completed.';
-      default:
-        return 'Settlement status updated successfully';
-    }
-  }
+function getSuccessMessage(status?: string): string {
+  if (!status) return 'Exchange updated successfully';
 
-  if (status) {
-    switch (status) {
-      case 'approved':
-        return 'Exchange approved successfully';
-      case 'rejected':
-        return 'Exchange rejected. Customer will be notified.';
-      case 'shipped':
-        return 'Exchange marked as shipped. Customer will receive tracking details.';
-      case 'completed':
-        return 'Exchange completed successfully';
-      default:
-        return 'Exchange updated successfully';
-    }
+  switch (status) {
+    case 'approved':
+      return 'Exchange approved successfully. Ready to ship.';
+    case 'rejected':
+      return 'Exchange rejected. Customer will be notified.';
+    case 'shipped':
+      return 'Exchange marked as shipped. Customer will receive tracking details.';
+    case 'completed':
+      return 'Exchange completed successfully.';
+    default:
+      return 'Exchange updated successfully';
   }
-
-  return 'Exchange updated successfully';
 }
