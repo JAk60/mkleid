@@ -1,6 +1,9 @@
 // lib/types.ts
 
 export interface Product {
+    size_chart: any;
+    size_chart: any;
+    has_size_chart: any;
 	id: number;
 	name: string;
 	description: string;

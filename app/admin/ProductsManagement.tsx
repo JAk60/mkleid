@@ -1,9 +1,25 @@
 import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, X, Save, Search, Upload, Image as ImageIcon } from "lucide-react";
+import { Plus, Edit, Trash2, X, Save, Search, Upload, Image as ImageIcon, Ruler, ChevronUp, ChevronDown } from "lucide-react";
 
 interface ColorOption {
   name: string;
   hex: string;
+}
+
+interface ProductImage {
+  id?: string;
+  image_url: string;
+  display_order: number;
+  is_primary: boolean;
+}
+
+interface SizeChart {
+  size: string;
+  chest?: number;
+  length?: number;
+  bust?: number;
+  length_female?: number;
+  notes?: string;
 }
 
 interface Product {
@@ -17,24 +33,18 @@ interface Product {
   colors: ColorOption[];
   stock: number;
   gender: "Male" | "Female";
+  images?: ProductImage[];
+  has_size_chart?: boolean;
+  size_chart?: SizeChart[];
 }
 
 const CATEGORIES = {
   Male: ["Oversized tshirt", "Jersey", "Sweatshirt", "Shirts", "Sweatpants"],
-  Female: [
-    "Baby tees",
-    "Jersey",
-    "Oversized tshirt",
-    "Shirts",
-    "Sweatshirts",
-    "Sweatpants",
-    "Flared pants",
-  ],
+  Female: ["Baby tees", "Jersey", "Oversized tshirt", "Shirts", "Sweatshirts", "Sweatpants", "Flared pants"],
 };
 
-const SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
+const SIZES = ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 
-// Common color presets
 const COLOR_PRESETS = [
   { name: 'Black', hex: '#000000' },
   { name: 'White', hex: '#FFFFFF' },
@@ -68,7 +78,12 @@ export default function ProductsManagement() {
   const [showPresets, setShowPresets] = useState(false);
   const [cloudinaryLoaded, setCloudinaryLoaded] = useState(false);
 
-  // PAGINATION
+  const [productImages, setProductImages] = useState<ProductImage[]>([]);
+  const [uploadingImageIndex, setUploadingImageIndex] = useState<number | null>(null);
+
+  const [showSizeChart, setShowSizeChart] = useState(false);
+  const [sizeChart, setSizeChart] = useState<SizeChart[]>([]);
+
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -82,6 +97,7 @@ export default function ProductsManagement() {
     colors: [],
     stock: 0,
     gender: "Male",
+    has_size_chart: false,
   });
 
   useEffect(() => {
@@ -92,21 +108,14 @@ export default function ProductsManagement() {
   const loadCloudinaryScript = () => {
     if ((window as any).cloudinary) {
       setCloudinaryLoaded(true);
-      console.log("✅ Cloudinary already loaded");
       return;
     }
 
     const script = document.createElement("script");
     script.src = "https://upload-widget.cloudinary.com/global/all.js";
     script.async = true;
-    script.onload = () => {
-      setCloudinaryLoaded(true);
-      console.log("✅ Cloudinary widget loaded successfully");
-    };
-    script.onerror = () => {
-      console.error("❌ Failed to load Cloudinary widget");
-      alert("Failed to load Cloudinary. Please refresh the page.");
-    };
+    script.onload = () => setCloudinaryLoaded(true);
+    script.onerror = () => alert("Failed to load Cloudinary. Please refresh the page.");
     document.body.appendChild(script);
   };
 
@@ -128,6 +137,9 @@ export default function ProductsManagement() {
     if (product) {
       setEditingProduct(product);
       setFormData(product);
+      setProductImages(product.images || [{ image_url: product.image_url, display_order: 0, is_primary: true }]);
+      setSizeChart(product.size_chart || []);
+      setShowSizeChart(product.has_size_chart || false);
     } else {
       setEditingProduct(null);
       setFormData({
@@ -140,7 +152,11 @@ export default function ProductsManagement() {
         colors: [],
         stock: 0,
         gender: "Male",
+        has_size_chart: false,
       });
+      setProductImages([]);
+      setSizeChart([]);
+      setShowSizeChart(false);
     }
     setColorNameInput("");
     setColorHexInput("");
@@ -151,12 +167,12 @@ export default function ProductsManagement() {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingProduct(null);
-    setColorNameInput("");
-    setColorHexInput("");
-    setShowPresets(false);
+    setProductImages([]);
+    setSizeChart([]);
+    setShowSizeChart(false);
   };
 
-  const handleCloudinaryUpload = () => {
+  const handleCloudinaryUpload = (imageIndex?: number) => {
     if (!cloudinaryLoaded || !(window as any).cloudinary) {
       alert("Cloudinary is still loading. Please try again in a moment.");
       return;
@@ -166,18 +182,17 @@ export default function ProductsManagement() {
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
     if (!cloudName || !uploadPreset) {
-      alert("Cloudinary is not configured. Please add NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET to your .env.local file");
-      console.error("Missing Cloudinary config:", { cloudName, uploadPreset });
+      alert("Cloudinary is not configured.");
       return;
     }
 
-    console.log("🚀 Opening Cloudinary widget with config:", { cloudName, uploadPreset });
     setUploading(true);
+    if (imageIndex !== undefined) setUploadingImageIndex(imageIndex);
 
     const widget = (window as any).cloudinary.createUploadWidget(
       {
-        cloudName: cloudName,
-        uploadPreset: uploadPreset,
+        cloudName,
+        uploadPreset,
         sources: ["local", "url", "camera"],
         folder: "products",
         multiple: false,
@@ -187,60 +202,44 @@ export default function ProductsManagement() {
         resourceType: "image",
         cropping: true,
         croppingAspectRatio: 1,
-        showSkipCropButton: false,
-        styles: {
-          palette: {
-            window: "#FFFFFF",
-            windowBorder: "#90A0B3",
-            tabIcon: "#2563EB",
-            menuIcons: "#5A616A",
-            textDark: "#000000",
-            textLight: "#FFFFFF",
-            link: "#2563EB",
-            action: "#2563EB",
-            inactiveTabIcon: "#9CA3AF",
-            error: "#EF4444",
-            inProgress: "#2563EB",
-            complete: "#10B981",
-            sourceBg: "#F3F4F6"
-          },
-          fonts: {
-            default: null,
-            "'Inter', sans-serif": {
-              url: "https://fonts.googleapis.com/css?family=Inter",
-              active: true
-            }
-          }
-        }
       },
       (error: any, result: any) => {
         if (error) {
-          console.error("❌ Cloudinary upload error:", error);
-          alert("Upload failed: " + (error.message || "Unknown error"));
+          console.error("Cloudinary upload error:", error);
+          alert("Upload failed");
           setUploading(false);
+          setUploadingImageIndex(null);
           return;
         }
 
-        console.log("📸 Cloudinary event:", result?.event);
-
         if (result?.event === "success") {
-          console.log("✅ Upload successful:", result.info.secure_url);
-          setFormData((prev) => ({ 
-            ...prev, 
-            image_url: result.info.secure_url 
-          }));
+          const imageUrl = result.info.secure_url;
+          
+          if (imageIndex !== undefined) {
+            const newImages = [...productImages];
+            newImages[imageIndex] = { ...newImages[imageIndex], image_url: imageUrl };
+            setProductImages(newImages);
+          } else {
+            const newImage: ProductImage = {
+              image_url: imageUrl,
+              display_order: productImages.length,
+              is_primary: productImages.length === 0,
+            };
+            setProductImages([...productImages, newImage]);
+          }
+          
+          if (productImages.length === 0 || imageIndex === 0) {
+            setFormData(prev => ({ ...prev, image_url: imageUrl }));
+          }
+          
           setUploading(false);
+          setUploadingImageIndex(null);
           widget.close();
         }
-        
-        if (result?.event === "close") {
-          console.log("🔒 Widget closed");
-          setUploading(false);
-        }
 
-        if (result?.event === "abort") {
-          console.log("⚠️ Upload aborted");
+        if (result?.event === "close" || result?.event === "abort") {
           setUploading(false);
+          setUploadingImageIndex(null);
         }
       }
     );
@@ -248,12 +247,69 @@ export default function ProductsManagement() {
     widget.open();
   };
 
+  const moveImage = (index: number, direction: "up" | "down") => {
+    const newImages = [...productImages];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    
+    if (targetIndex < 0 || targetIndex >= newImages.length) return;
+    
+    [newImages[index], newImages[targetIndex]] = [newImages[targetIndex], newImages[index]];
+    newImages[index].display_order = index;
+    newImages[targetIndex].display_order = targetIndex;
+    
+    setProductImages(newImages);
+    
+    if (newImages[0].is_primary) {
+      setFormData(prev => ({ ...prev, image_url: newImages[0].image_url }));
+    }
+  };
+
+  const removeImage = (index: number) => {
+    const newImages = productImages.filter((_, i) => i !== index);
+    newImages.forEach((img, i) => {
+      img.display_order = i;
+      if (i === 0) img.is_primary = true;
+    });
+    setProductImages(newImages);
+    
+    if (newImages.length > 0) {
+      setFormData(prev => ({ ...prev, image_url: newImages[0].image_url }));
+    }
+  };
+
+  const setPrimaryImage = (index: number) => {
+    const newImages = productImages.map((img, i) => ({
+      ...img,
+      is_primary: i === index,
+    }));
+    setProductImages(newImages);
+    setFormData(prev => ({ ...prev, image_url: newImages[index].image_url }));
+  };
+
+  const initializeSizeChart = () => {
+    const chart = formData.sizes.map(size => ({
+      size,
+      chest: undefined,
+      length: undefined,
+      bust: undefined,
+      length_female: undefined,
+      notes: "",
+    }));
+    setSizeChart(chart);
+  };
+
+  const updateSizeChart = (index: number, field: keyof SizeChart, value: any) => {
+    const newChart = [...sizeChart];
+    newChart[index] = { ...newChart[index], [field]: value };
+    setSizeChart(newChart);
+  };
+
   const addPresetColor = (preset: ColorOption) => {
     if (formData.colors.some(c => c.hex === preset.hex)) {
       alert("This color is already added");
       return;
     }
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       colors: [...prev.colors, preset],
     }));
@@ -270,7 +326,7 @@ export default function ProductsManagement() {
 
     const regex = /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/;
     if (!regex.test(hex)) {
-      alert("Invalid hex color. Use format: #FF0000 or FF0000");
+      alert("Invalid hex color");
       return;
     }
 
@@ -283,7 +339,7 @@ export default function ProductsManagement() {
       return;
     }
 
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       colors: [...prev.colors, { name: colorNameInput.trim(), hex: hex.toUpperCase() }],
     }));
@@ -293,23 +349,29 @@ export default function ProductsManagement() {
   };
 
   const removeColor = (hex: string) => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
-      colors: prev.colors.filter((x) => x.hex !== hex),
+      colors: prev.colors.filter(x => x.hex !== hex),
     }));
   };
 
   const toggleSize = (size: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      sizes: prev.sizes.includes(size)
-        ? prev.sizes.filter((s) => s !== size)
-        : [...prev.sizes, size],
-    }));
+    const newSizes = formData.sizes.includes(size)
+      ? formData.sizes.filter(s => s !== size)
+      : [...formData.sizes, size];
+    
+    setFormData(prev => ({ ...prev, sizes: newSizes }));
+    
+    if (showSizeChart) {
+      if (newSizes.includes(size) && !sizeChart.find(s => s.size === size)) {
+        setSizeChart([...sizeChart, { size, notes: "" }]);
+      } else if (!newSizes.includes(size)) {
+        setSizeChart(sizeChart.filter(s => s.size !== size));
+      }
+    }
   };
 
   const handleSubmit = async () => {
-    // Validation
     if (!formData.name.trim()) {
       alert("Product name is required");
       return;
@@ -330,33 +392,47 @@ export default function ProductsManagement() {
       alert("Add at least one color");
       return;
     }
-    if (formData.stock < 0) {
-      alert("Stock cannot be negative");
+    if (productImages.length === 0) {
+      alert("Please upload at least one product image");
       return;
     }
-    if (!formData.image_url.trim()) {
-      alert("Please upload a product image");
-      return;
+    
+    if (showSizeChart && sizeChart.length > 0) {
+      const isValid = sizeChart.every(s => {
+        if (formData.gender === "Male") {
+          return s.chest && s.length;
+        } else {
+          return s.bust && s.length_female;
+        }
+      });
+      
+      if (!isValid) {
+        alert(`Please fill all size chart measurements for ${formData.gender === "Male" ? "Chest and Length" : "Bust and Length"}`);
+        return;
+      }
     }
 
     try {
       setSubmitting(true);
 
-      const method = editingProduct ? "PUT" : "POST";
+      const payload = {
+        ...formData,
+        images: productImages,
+        has_size_chart: showSizeChart,
+        size_chart: showSizeChart ? sizeChart : [],
+      };
 
+      const method = editingProduct ? "PUT" : "POST";
       const res = await fetch("/api/admin/products", {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          editingProduct ? { id: editingProduct.id, ...formData } : formData
-        ),
+        body: JSON.stringify(editingProduct ? { id: editingProduct.id, ...payload } : payload),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error);
 
       alert(editingProduct ? "Product updated successfully!" : "Product created successfully!");
-
       await fetchProducts();
       handleCloseModal();
     } catch (err: any) {
@@ -370,10 +446,7 @@ export default function ProductsManagement() {
     if (!confirm("Are you sure you want to delete this product?")) return;
 
     try {
-      const res = await fetch(`/api/admin/products?id=${id}`, {
-        method: "DELETE",
-      });
-
+      const res = await fetch(`/api/admin/products?id=${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
 
@@ -384,30 +457,18 @@ export default function ProductsManagement() {
     }
   };
 
-  // FILTERING
-  const filteredProducts = products.filter((p) => {
+  const filteredProducts = products.filter(p => {
     const s = searchQuery.toLowerCase();
-    const matchesSearch =
-      p.name.toLowerCase().includes(s) ||
-      p.category.toLowerCase().includes(s);
+    const matchesSearch = p.name.toLowerCase().includes(s) || p.category.toLowerCase().includes(s);
     const matchesGender = filterGender === "all" || p.gender === filterGender;
     const matchesCategory = filterCategory === "all" || p.category === filterCategory;
-
     return matchesSearch && matchesGender && matchesCategory;
   });
 
-  // PAGINATION
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
-  const indexOfLast = currentPage * itemsPerPage;
-  const indexOfFirst = indexOfLast - itemsPerPage;
-  const currentItems = filteredProducts.slice(indexOfFirst, indexOfLast);
+  const currentItems = filteredProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const goToPage = (page: number) => {
-    if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
-  };
-
-  if (loading)
+  if (loading) {
     return (
       <div className="flex justify-center items-center h-96">
         <div className="text-center">
@@ -416,16 +477,15 @@ export default function ProductsManagement() {
         </div>
       </div>
     );
+  }
 
   return (
     <div className="p-6 space-y-6">
-      {/* HEADER */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Products Management</h1>
           <p className="text-gray-600 mt-1">{filteredProducts.length} products found</p>
         </div>
-
         <button
           onClick={() => handleOpenModal()}
           className="px-6 py-3 bg-blue-600 text-white rounded-lg flex items-center gap-2 hover:bg-blue-700 transition shadow-lg"
@@ -434,7 +494,6 @@ export default function ProductsManagement() {
         </button>
       </div>
 
-      {/* FILTERS */}
       <div className="bg-white p-4 rounded-xl border shadow-sm space-y-4">
         <div className="flex gap-4 flex-wrap">
           <div className="relative flex-1 min-w-[250px]">
@@ -449,7 +508,6 @@ export default function ProductsManagement() {
               className="w-full px-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-
           <select
             value={filterGender}
             onChange={(e) => {
@@ -457,58 +515,29 @@ export default function ProductsManagement() {
               setFilterCategory("all");
               setCurrentPage(1);
             }}
-            className="border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Genders</option>
             <option value="Male">Male</option>
             <option value="Female">Female</option>
           </select>
-
-          <select
-            value={filterCategory}
-            onChange={(e) => {
-              setFilterCategory(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">All Categories</option>
-            {(
-              filterGender === "all"
-                ? Array.from(new Set([...CATEGORIES.Male, ...CATEGORIES.Female]))
-                : CATEGORIES[filterGender]
-            ).map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
-      {/* PRODUCTS LIST */}
       <div className="space-y-4">
         {currentItems.length === 0 ? (
           <div className="bg-white rounded-lg border p-12 text-center">
             <ImageIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500 text-lg">No products found</p>
-            <p className="text-gray-400 text-sm mt-2">Try adjusting your filters or add a new product</p>
           </div>
         ) : (
           currentItems.map((product) => (
-            <div
-              key={product.id}
-              className="bg-white rounded-lg border p-4 flex gap-4 hover:shadow-md transition"
-            >
+            <div key={product.id} className="bg-white rounded-lg border p-4 flex gap-4 hover:shadow-md transition">
               <img
                 src={product.image_url}
                 alt={product.name}
                 className="w-24 h-24 rounded object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/96?text=No+Image';
-                }}
               />
-
               <div className="flex-1">
                 <div className="flex items-start justify-between">
                   <div>
@@ -519,61 +548,36 @@ export default function ProductsManagement() {
                     <button
                       onClick={() => handleOpenModal(product)}
                       className="p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition"
-                      title="Edit"
                     >
                       <Edit size={18} />
                     </button>
                     <button
                       onClick={() => handleDelete(product.id!)}
                       className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200 transition"
-                      title="Delete"
                     >
                       <Trash2 size={18} />
                     </button>
                   </div>
                 </div>
-
                 <div className="mt-3 flex items-center gap-4 flex-wrap">
                   <span className="font-bold text-blue-600 text-lg">₹{product.price.toLocaleString()}</span>
                   <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    product.gender === 'Male' 
-                      ? 'bg-blue-100 text-blue-800' 
-                      : 'bg-pink-100 text-pink-800'
+                    product.gender === 'Male' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'
                   }`}>
                     {product.gender}
                   </span>
-                  <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-semibold">
-                    {product.category}
-                  </span>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    product.stock > 10 
-                      ? 'bg-green-100 text-green-800'
-                      : product.stock > 0
-                      ? 'bg-orange-100 text-orange-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    Stock: {product.stock}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    Sizes: {product.sizes.join(", ")}
-                  </span>
-                  <div className="flex gap-2 items-center">
-                    {product.colors.slice(0, 5).map((color, i) => (
-                      <div key={i} className="flex flex-col items-center">
-                        <div
-                          className="w-8 h-8 rounded-full border-2 border-gray-300"
-                          style={{ backgroundColor: color.hex }}
-                          title={`${color.name} (${color.hex})`}
-                        />
-                        <span className="text-xs text-gray-600 mt-1">{color.name}</span>
-                      </div>
-                    ))}
-                    {product.colors.length > 5 && (
-                      <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs">
-                        +{product.colors.length - 5}
-                      </div>
-                    )}
-                  </div>
+                  {product.has_size_chart && (
+                    <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold flex items-center gap-1">
+                      <Ruler size={14} />
+                      Size Chart
+                    </span>
+                  )}
+                  {product.images && product.images.length > 1 && (
+                    <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-semibold flex items-center gap-1">
+                      <ImageIcon size={14} />
+                      {product.images.length} Images
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -581,33 +585,28 @@ export default function ProductsManagement() {
         )}
       </div>
 
-      {/* PAGINATION */}
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2">
           <button
-            onClick={() => goToPage(currentPage - 1)}
+            onClick={() => setCurrentPage(currentPage - 1)}
             disabled={currentPage === 1}
             className="px-4 py-2 border rounded disabled:opacity-40 hover:bg-gray-100 transition"
           >
             Previous
           </button>
-
           {[...Array(totalPages)].map((_, i) => (
             <button
               key={i}
-              onClick={() => goToPage(i + 1)}
+              onClick={() => setCurrentPage(i + 1)}
               className={`px-4 py-2 border rounded transition ${
-                currentPage === i + 1
-                  ? "bg-blue-600 text-white"
-                  : "hover:bg-gray-100"
+                currentPage === i + 1 ? "bg-blue-600 text-white" : "hover:bg-gray-100"
               }`}
             >
               {i + 1}
             </button>
           ))}
-
           <button
-            onClick={() => goToPage(currentPage + 1)}
+            onClick={() => setCurrentPage(currentPage + 1)}
             disabled={currentPage === totalPages}
             className="px-4 py-2 border rounded disabled:opacity-40 hover:bg-gray-100 transition"
           >
@@ -616,65 +615,46 @@ export default function ProductsManagement() {
         </div>
       )}
 
-      {/* MODAL */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white p-6 border-b flex justify-between items-center z-10">
               <h2 className="text-2xl font-bold">
                 {editingProduct ? "Edit Product" : "Add New Product"}
               </h2>
-              <button 
-                onClick={handleCloseModal} 
-                className="hover:bg-gray-100 p-2 rounded-full transition"
-                disabled={submitting || uploading}
-              >
+              <button onClick={handleCloseModal} className="hover:bg-gray-100 p-2 rounded-full transition">
                 <X size={24} />
               </button>
             </div>
 
             <div className="p-6 space-y-6">
-              {/* NAME */}
               <div>
                 <label className="block font-medium mb-1">Product Name *</label>
                 <input
                   value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g., Premium Cotton T-Shirt"
                 />
               </div>
 
-              {/* DESCRIPTION */}
               <div>
                 <label className="block font-medium mb-1">Description</label>
                 <textarea
                   value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
-                  className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Describe your product..."
+                  className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
-              {/* GENDER + CATEGORY */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block font-medium mb-1">Gender *</label>
                   <select
                     value={formData.gender}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        gender: e.target.value as "Male" | "Female",
-                        category: "",
-                      })
-                    }
-                    className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(e) => setFormData({ ...formData, gender: e.target.value as "Male" | "Female", category: "" })}
+                    className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
@@ -685,20 +665,17 @@ export default function ProductsManagement() {
                   <label className="block font-medium mb-1">Category *</label>
                   <select
                     value={formData.category}
-                    onChange={(e) =>
-                      setFormData({ ...formData, category: e.target.value })
-                    }
-                    className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Category</option>
-                    {CATEGORIES[formData.gender].map((c) => (
+                    {CATEGORIES[formData.gender].map(c => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
                 </div>
               </div>
 
-              {/* PRICE + STOCK */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block font-medium mb-1">Price (₹) *</label>
@@ -706,98 +683,85 @@ export default function ProductsManagement() {
                     type="number"
                     min="0"
                     value={formData.price}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        price: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0"
+                    onChange={(e) => setFormData({ ...formData, price: parseInt(e.target.value) || 0 })}
+                    className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-medium mb-1">Stock Quantity *</label>
+                  <label className="block font-medium mb-1">Stock *</label>
                   <input
                     type="number"
                     min="0"
                     value={formData.stock}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        stock: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0"
+                    onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
+                    className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
-              {/* IMAGE UPLOAD */}
               <div>
-                <label className="block font-medium mb-2">Product Image *</label>
-
-                {!cloudinaryLoaded ? (
-                  <div className="w-full border-2 border-dashed rounded-lg p-6 text-center bg-gray-50">
-                    <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-2" />
-                    <p className="text-sm text-gray-600">Loading Cloudinary...</p>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleCloudinaryUpload}
-                    disabled={uploading}
-                    className="w-full border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Upload size={32} className="mx-auto mb-2 text-blue-600" />
-                    <p className="font-medium text-gray-700">
-                      {uploading ? "Uploading..." : "Click to Upload Image"}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      PNG, JPG, JPEG or WEBP (Max 2MB)
-                    </p>
-                    <p className="text-xs text-gray-400 mt-2">
-                      Cloudinary upload widget will open
-                    </p>
-                  </button>
-                )}
-
-                {formData.image_url && (
-                  <div className="mt-4 relative">
-                    <img
-                      src={formData.image_url}
-                      className="w-full h-64 object-cover rounded-lg border"
-                      alt="Product preview"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, image_url: "" })}
-                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                )}
-
-                <div className="mt-3">
-                  <input
-                    value={formData.image_url}
-                    onChange={(e) =>
-                      setFormData({ ...formData, image_url: e.target.value })
-                    }
-                    className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    placeholder="Or paste image URL here..."
-                  />
+                <label className="block font-medium mb-3">Product Images * (Multiple)</label>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                  {productImages.map((img, index) => (
+                    <div key={index} className="relative border-2 border-gray-300 rounded-lg overflow-hidden group">
+                      <img src={img.image_url} alt={`Product ${index + 1}`} className="w-full h-48 object-cover" />
+                      
+                      {img.is_primary && (
+                        <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded font-semibold">
+                          Primary
+                        </div>
+                      )}
+                      
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => moveImage(index, "up")}
+                          disabled={index === 0}
+                          className="p-2 bg-white rounded disabled:opacity-50"
+                        >
+                          <ChevronUp size={16} />
+                        </button>
+                        <button
+                          onClick={() => moveImage(index, "down")}
+                          disabled={index === productImages.length - 1}
+                          className="p-2 bg-white rounded disabled:opacity-50"
+                        >
+                          <ChevronDown size={16} />
+                        </button>
+                        {!img.is_primary && (
+                          <button onClick={() => setPrimaryImage(index)} className="p-2 bg-blue-600 text-white rounded text-xs">
+                            Set Primary
+                          </button>
+                        )}
+                        <button onClick={() => handleCloudinaryUpload(index)} className="p-2 bg-green-600 text-white rounded">
+                          <Upload size={16} />
+                        </button>
+                        <button onClick={() => removeImage(index)} className="p-2 bg-red-600 text-white rounded">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleCloudinaryUpload()}
+                  disabled={uploading}
+                  className="w-full border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition disabled:opacity-50"
+                >
+                  <Upload size={32} className="mx-auto mb-2 text-blue-600" />
+                  <p className="font-medium text-gray-700">
+                    {uploading ? "Uploading..." : `Add ${productImages.length > 0 ? 'Another' : ''} Image`}
+                  </p>
+                </button>
               </div>
 
-              {/* SIZES */}
               <div>
                 <label className="block font-medium mb-2">Available Sizes *</label>
                 <div className="flex gap-2 flex-wrap">
-                  {SIZES.map((s) => (
+                  {SIZES.map(s => (
                     <button
                       key={s}
                       type="button"
@@ -814,103 +778,140 @@ export default function ProductsManagement() {
                 </div>
               </div>
 
-              {/* COLORS */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={showSizeChart}
+                      onChange={(e) => {
+                        setShowSizeChart(e.target.checked);
+                        if (e.target.checked && sizeChart.length === 0) {
+                          initializeSizeChart();
+                        }
+                      }}
+                      className="w-5 h-5"
+                    />
+                    <span className="font-medium">Add Size Chart</span>
+                  </label>
+                  {showSizeChart && (
+                    <button
+                      type="button"
+                      onClick={initializeSizeChart}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      Reset Chart
+                    </button>
+                  )}
+                </div>
+
+                {showSizeChart && (
+                  <div className="border rounded-lg p-4 bg-gray-50">
+                    <div className="text-sm text-gray-600 mb-3">
+                      {formData.gender === "Male" ? (
+                        <span>📏 Fill measurements: <strong>Chest</strong> and <strong>Length</strong> (in inches)</span>
+                      ) : (
+                        <span>📏 Fill measurements: <strong>Bust</strong> and <strong>Length</strong> (in inches)</span>
+                      )}
+                    </div>
+                    
+                    {sizeChart.length === 0 ? (
+                      <p className="text-gray-500 text-sm">Select sizes above to add to size chart</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {sizeChart.map((item, index) => (
+                          <div key={item.size} className="bg-white p-4 rounded border">
+                            <h4 className="font-bold mb-3 text-lg">{item.size}</h4>
+                            
+                            {formData.gender === "Male" ? (
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-sm font-medium mb-1">Chest (inches) *</label>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    value={item.chest || ""}
+                                    onChange={(e) => updateSizeChart(index, "chest", parseFloat(e.target.value) || undefined)}
+                                    className="w-full border px-3 py-2 rounded focus:ring-2 focus:ring-blue-500"
+                                    placeholder="e.g., 38"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium mb-1">Length (inches) *</label>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    value={item.length || ""}
+                                    onChange={(e) => updateSizeChart(index, "length", parseFloat(e.target.value) || undefined)}
+                                    className="w-full border px-3 py-2 rounded focus:ring-2 focus:ring-blue-500"
+                                    placeholder="e.g., 27"
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-sm font-medium mb-1">Bust (inches) *</label>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    value={item.bust || ""}
+                                    onChange={(e) => updateSizeChart(index, "bust", parseFloat(e.target.value) || undefined)}
+                                    className="w-full border px-3 py-2 rounded focus:ring-2 focus:ring-blue-500"
+                                    placeholder="e.g., 34"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium mb-1">Length (inches) *</label>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    value={item.length_female || ""}
+                                    onChange={(e) => updateSizeChart(index, "length_female", parseFloat(e.target.value) || undefined)}
+                                    className="w-full border px-3 py-2 rounded focus:ring-2 focus:ring-blue-500"
+                                    placeholder="e.g., 28"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="mt-3">
+                              <label className="block text-sm font-medium mb-1">Notes (optional)</label>
+                              <input
+                                type="text"
+                                value={item.notes || ""}
+                                onChange={(e) => updateSizeChart(index, "notes", e.target.value)}
+                                className="w-full border px-3 py-2 rounded focus:ring-2 focus:ring-blue-500"
+                                placeholder="Any additional info..."
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block font-medium mb-2">Colors *</label>
                 
-                {/* Quick Presets */}
-                <div className="mb-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowPresets(!showPresets)}
-                    className="text-sm text-blue-600 hover:text-blue-700 mb-2"
-                  >
-                    {showPresets ? '▼ Hide' : '▶ Show'} Quick Color Presets
-                  </button>
-                  
-                  {showPresets && (
-                    <div className="grid grid-cols-5 gap-2 p-3 bg-gray-50 rounded-lg border">
-                      {COLOR_PRESETS.map((preset) => (
-                        <button
-                          key={preset.hex}
-                          type="button"
-                          onClick={() => addPresetColor(preset)}
-                          disabled={formData.colors.some(c => c.hex === preset.hex)}
-                          className="flex flex-col items-center gap-1 p-2 rounded hover:bg-white transition disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <div
-                            className="w-10 h-10 rounded-full border-2 border-gray-300"
-                            style={{ backgroundColor: preset.hex }}
-                          />
-                          <span className="text-xs font-medium text-gray-700">
-                            {preset.name}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Custom Color Input */}
-                <div className="flex gap-2 mb-4">
-                  <input
-                    type="text"
-                    value={colorNameInput}
-                    onChange={(e) => setColorNameInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddCustomColor()}
-                    className="flex-1 border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Color name (e.g., Sky Blue)"
-                  />
-                  <input
-                    value={colorHexInput}
-                    onChange={(e) => setColorHexInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddCustomColor()}
-                    className="w-32 border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-                    placeholder="#FF5733"
-                  />
-                  {colorHexInput && (
-                    <div
-                      className="w-12 h-12 rounded-lg border-2 border-gray-300 flex-shrink-0"
-                      style={{ 
-                        backgroundColor: colorHexInput.startsWith('#') 
-                          ? colorHexInput 
-                          : '#' + colorHexInput 
-                      }}
-                    />
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleAddCustomColor}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
-                  >
-                    Add
-                  </button>
-                </div>
-
-                {/* Selected Colors */}
                 {formData.colors.length > 0 && (
-                  <div className="grid grid-cols-2 gap-3">
-                    {formData.colors.map((color) => (
+                  <div className="flex gap-2 flex-wrap mb-3">
+                    {formData.colors.map((c) => (
                       <div
-                        key={color.hex}
-                        className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition border"
+                        key={c.hex}
+                        className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg"
                       >
                         <div
-                          className="w-10 h-10 rounded-lg border-2 border-gray-300 flex-shrink-0"
-                          style={{ backgroundColor: color.hex }}
+                          className="w-6 h-6 rounded border-2 border-gray-300"
+                          style={{ backgroundColor: c.hex }}
                         />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-gray-900 text-sm truncate">
-                            {color.name}
-                          </div>
-                          <div className="text-xs text-gray-500 font-mono">
-                            {color.hex}
-                          </div>
-                        </div>
+                        <span className="text-sm font-medium">{c.name}</span>
                         <button
                           type="button"
-                          onClick={() => removeColor(color.hex)}
-                          className="p-1.5 text-red-500 hover:bg-red-50 rounded transition flex-shrink-0"
+                          onClick={() => removeColor(c.hex)}
+                          className="text-red-600 hover:text-red-800"
                         >
                           <X size={16} />
                         </button>
@@ -919,43 +920,92 @@ export default function ProductsManagement() {
                   </div>
                 )}
 
-                {formData.colors.length === 0 && (
-                  <div className="text-center py-6 text-gray-400 border-2 border-dashed rounded-lg">
-                    No colors added yet. Use presets or add custom colors.
-                  </div>
-                )}
-              </div>
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowPresets(!showPresets)}
+                    className="text-blue-600 hover:underline text-sm font-medium"
+                  >
+                    {showPresets ? "Hide" : "Show"} Color Presets
+                  </button>
 
-              {/* SUBMIT */}
-              <div className="flex gap-4 pt-4 border-t mt-6">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  disabled={submitting || uploading}
-                  className="flex-1 bg-gray-100 py-3 rounded-lg hover:bg-gray-200 transition font-medium disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={submitting || uploading}
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {submitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={18} />
-                      {editingProduct ? "Update Product" : "Create Product"}
-                    </>
+                  {showPresets && (
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <div className="grid grid-cols-5 gap-2">
+                        {COLOR_PRESETS.map((preset) => (
+                          <button
+                            key={preset.hex}
+                            type="button"
+                            onClick={() => addPresetColor(preset)}
+                            className="flex flex-col items-center gap-1 p-2 hover:bg-white rounded transition"
+                          >
+                            <div
+                              className="w-10 h-10 rounded-full border-2 border-gray-300"
+                              style={{ backgroundColor: preset.hex }}
+                            />
+                            <span className="text-xs">{preset.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                </button>
+
+                  <div className="border-t pt-3">
+                    <p className="text-sm font-medium mb-2">Add Custom Color</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={colorNameInput}
+                        onChange={(e) => setColorNameInput(e.target.value)}
+                        placeholder="Color name"
+                        className="flex-1 border px-3 py-2 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        value={colorHexInput}
+                        onChange={(e) => setColorHexInput(e.target.value)}
+                        placeholder="#RRGGBB"
+                        className="w-32 border px-3 py-2 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCustomColor}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
+            </div>
+
+            <div className="sticky bottom-0 bg-white border-t p-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="px-6 py-2 border rounded-lg hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save size={18} />
+                    {editingProduct ? "Update Product" : "Create Product"}
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

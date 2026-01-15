@@ -1,8 +1,8 @@
-// app/products/[slug]/page.tsx - FIXED VERSION WITH PROPER COLOR HANDLING
+// app/products/[slug]/page.tsx - Updated with Multiple Images & Size Chart
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -10,7 +10,7 @@ import { Product } from '@/lib/types';
 import { getProducts } from '@/lib/supabase';
 import { formatPrice, generateSlug, generateCategorySlug, addSlugToProduct } from '@/utils/helpers';
 import ProductCard from '@/components/products/ProductCard';
-import { ChevronLeft, Check, ShoppingCart, Plus, Minus } from 'lucide-react';
+import { ChevronLeft, Check, ShoppingCart, Plus, Minus, Ruler, X } from 'lucide-react';
 import { useCart } from '@/context/cart-context';
 import { toast } from 'react-hot-toast';
 
@@ -28,6 +28,7 @@ export default function ProductDetailPage() {
     const [quantity, setQuantity] = useState<number>(1);
     const [selectedImage, setSelectedImage] = useState(0);
     const [isAdding, setIsAdding] = useState(false);
+    const [showSizeChart, setShowSizeChart] = useState(false);
 
     useEffect(() => {
         async function fetchProduct() {
@@ -35,10 +36,7 @@ export default function ProductDetailPage() {
                 const allProducts = await getProducts();
                 const productsWithSlugs = allProducts.map(addSlugToProduct);
 
-                // Find the product by slug
-                const foundProduct = productsWithSlugs.find(
-                    p => p.slug === slug
-                );
+                const foundProduct = productsWithSlugs.find(p => p.slug === slug);
 
                 if (!foundProduct) {
                     router.push('/products');
@@ -47,10 +45,8 @@ export default function ProductDetailPage() {
 
                 setProduct(foundProduct);
                 
-                // Set default size and color
                 setSelectedSize(foundProduct.sizes[0] || '');
                 
-                // Handle color - get first color value
                 const firstColor = foundProduct.colors[0];
                 const colorValue = typeof firstColor === 'string' 
                     ? firstColor 
@@ -59,7 +55,6 @@ export default function ProductDetailPage() {
                         : 'Black';
                 setSelectedColor(colorValue);
 
-                // Get related products from same category
                 const related = productsWithSlugs
                     .filter(p => p.category === foundProduct.category && p.id !== foundProduct.id)
                     .slice(0, 4);
@@ -76,12 +71,11 @@ export default function ProductDetailPage() {
         fetchProduct();
     }, [slug, router]);
 
-    // Reset quantity when size or color changes
     useEffect(() => {
         if (product && selectedSize && selectedColor) {
             const itemInCart = getCartItemQuantity(product.id, selectedSize, selectedColor);
             if (itemInCart > 0) {
-                setQuantity(1); // Reset to 1 when changing to variant already in cart
+                setQuantity(1);
             }
         }
     }, [selectedSize, selectedColor, product, getCartItemQuantity]);
@@ -92,7 +86,6 @@ export default function ProductDetailPage() {
         if (newQuantity < 1) return;
 
         if (product && product.stock > 0) {
-            // Check total quantity (in cart + new quantity)
             const itemInCart = getCartItemQuantity(product.id, selectedSize, selectedColor);
             const totalQuantity = itemInCart + newQuantity;
             
@@ -106,7 +99,6 @@ export default function ProductDetailPage() {
     };
 
     const handleColorChange = (color: any) => {
-        // Get color value
         const colorValue = typeof color === 'string' 
             ? color 
             : (color && typeof color === 'object' && 'hex' in color)
@@ -114,13 +106,11 @@ export default function ProductDetailPage() {
                 : 'Black';
         
         setSelectedColor(colorValue);
-        // Reset quantity when color changes
         setQuantity(1);
     };
 
     const handleSizeChange = (size: string) => {
         setSelectedSize(size);
-        // Reset quantity when size changes
         setQuantity(1);
     };
 
@@ -142,7 +132,6 @@ export default function ProductDetailPage() {
             return;
         }
 
-        // Check stock including items already in cart
         const itemInCart = getCartItemQuantity(product.id, selectedSize, selectedColor);
         const totalQuantity = itemInCart + quantity;
         
@@ -153,7 +142,6 @@ export default function ProductDetailPage() {
 
         setIsAdding(true);
 
-        // Add items to cart based on quantity
         for (let i = 0; i < quantity; i++) {
             addItem({
                 id: product.id,
@@ -172,14 +160,12 @@ export default function ProductDetailPage() {
             duration: 3000,
         });
 
-        // Reset adding state and quantity after animation
         setTimeout(() => {
             setIsAdding(false);
             setQuantity(1);
         }, 600);
     };
 
-    // Helper to get color hex
     const getColorHex = (color: any): string => {
         if (typeof color === 'string') {
             return color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase();
@@ -189,7 +175,6 @@ export default function ProductDetailPage() {
         return '#000000';
     };
 
-    // Helper to get color name/value
     const getColorValue = (color: any): string => {
         if (typeof color === 'string') {
             return color;
@@ -199,7 +184,6 @@ export default function ProductDetailPage() {
         return 'Unknown';
     };
 
-    // Helper to get color display name
     const getColorName = (color: any): string => {
         if (typeof color === 'string') {
             return color;
@@ -230,7 +214,7 @@ export default function ProductDetailPage() {
     const inCart = isInCart(product.id, selectedSize, selectedColor);
     const cartQuantity = getCartItemQuantity(product.id, selectedSize, selectedColor);
 
-    // Prepare images array (support for future multiple images)
+    // Use product images if available, otherwise fallback to image_url
     const images = product.images && product.images.length > 0
         ? product.images
         : [product.image_url];
@@ -258,7 +242,6 @@ export default function ProductDetailPage() {
             </div>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Back Button */}
                 <Link
                     href="/products"
                     className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-8"
@@ -287,15 +270,15 @@ export default function ProductDetailPage() {
                             )}
                         </div>
 
-                        {/* Thumbnail Gallery (for future multiple images) */}
+                        {/* Thumbnail Gallery */}
                         {images.length > 1 && (
                             <div className="grid grid-cols-4 gap-4">
                                 {images.map((img, index) => (
                                     <button
                                         key={index}
                                         onClick={() => setSelectedImage(index)}
-                                        className={`relative aspect-square rounded-lg overflow-hidden ${
-                                            selectedImage === index ? 'ring-2 ring-gray-900' : 'ring-1 ring-gray-200'
+                                        className={`relative aspect-square rounded-lg overflow-hidden transition-all ${
+                                            selectedImage === index ? 'ring-2 ring-gray-900 scale-105' : 'ring-1 ring-gray-200 hover:ring-gray-400'
                                         }`}
                                     >
                                         <Image
@@ -341,9 +324,20 @@ export default function ProductDetailPage() {
 
                         {/* Size Selection */}
                         <div>
-                            <label className="block text-sm font-medium mb-3">
-                                Size: <span className="font-normal text-gray-600">{selectedSize}</span>
-                            </label>
+                            <div className="flex items-center justify-between mb-3">
+                                <label className="block text-sm font-medium">
+                                    Size: <span className="font-normal text-gray-600">{selectedSize}</span>
+                                </label>
+                                {product.has_size_chart && product.size_chart && product.size_chart.length > 0 && (
+                                    <button
+                                        onClick={() => setShowSizeChart(true)}
+                                        className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                                    >
+                                        <Ruler className="w-4 h-4" />
+                                        Size Guide
+                                    </button>
+                                )}
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 {product.sizes.map((size) => (
                                     <button
@@ -511,6 +505,70 @@ export default function ProductDetailPage() {
                     </div>
                 )}
             </div>
+
+            {/* Size Chart Modal */}
+            {showSizeChart && product.size_chart && product.size_chart.length > 0 && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-xl w-full max-w-3xl max-h-[80vh] overflow-y-auto">
+                        <div className="sticky top-0 bg-white p-6 border-b flex justify-between items-center z-10">
+                            <h2 className="text-2xl font-bold">Size Guide</h2>
+                            <button
+                                onClick={() => setShowSizeChart(false)}
+                                className="hover:bg-gray-100 p-2 rounded-full transition"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div className="p-6">
+                            <p className="text-sm text-gray-600 mb-4">
+                                All measurements are in inches
+                            </p>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-100">
+                                            <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Size</th>
+                                            {product.gender === 'Male' ? (
+                                                <>
+                                                    <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Chest</th>
+                                                    <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Length</th>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Bust</th>
+                                                    <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Length</th>
+                                                </>
+                                            )}
+                                            <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {product.size_chart.map((chart: { size: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; chest: any; length: any; bust: any; length_female: any; notes: any; }, index: Key | null | undefined) => (
+                                            <tr key={index} className="hover:bg-gray-50">
+                                                <td className="border border-gray-300 px-4 py-3 font-semibold">{chart.size}</td>
+                                                {product.gender === 'Male' ? (
+                                                    <>
+                                                        <td className="border border-gray-300 px-4 py-3">{chart.chest || '-'}"</td>
+                                                        <td className="border border-gray-300 px-4 py-3">{chart.length || '-'}"</td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <td className="border border-gray-300 px-4 py-3">{chart.bust || '-'}"</td>
+                                                        <td className="border border-gray-300 px-4 py-3">{chart.length_female || '-'}"</td>
+                                                    </>
+                                                )}
+                                                <td className="border border-gray-300 px-4 py-3 text-sm text-gray-600">{chart.notes || '-'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

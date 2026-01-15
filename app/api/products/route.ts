@@ -1,48 +1,29 @@
-// app/api/admin/products/route.ts
+// app/api/products/route.ts
 
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 export async function GET(request: Request) {
   try {
-    console.log('📦 Admin Products API called');
+    console.log('📦 Public Products API called');
 
     const { searchParams } = new URL(request.url);
     
-    // Get query parameters
     const limit = searchParams.get('limit');
     const gender = searchParams.get('gender');
     const category = searchParams.get('category');
-    const lowStock = searchParams.get('lowStock'); // Get products with low stock
-    const outOfStock = searchParams.get('outOfStock'); // Get out of stock products
+    const inStock = searchParams.get('inStock');
 
-    // Build query
+    // Build query for products
     let query = supabase
       .from('products')
       .select('*');
 
-    // Apply filters
-    if (gender) {
-      query = query.eq('gender', gender);
-    }
+    if (gender) query = query.eq('gender', gender);
+    if (category) query = query.eq('category', category);
+    if (inStock === 'true') query = query.gt('stock', 0);
+    if (limit) query = query.limit(parseInt(limit));
 
-    if (category) {
-      query = query.eq('category', category);
-    }
-
-    if (lowStock === 'true') {
-      query = query.lte('stock', 5).gt('stock', 0);
-    }
-
-    if (outOfStock === 'true') {
-      query = query.eq('stock', 0);
-    }
-
-    if (limit) {
-      query = query.limit(parseInt(limit));
-    }
-
-    // Order by created date (newest first)
     query = query.order('created_at', { ascending: false });
 
     const { data: products, error } = await query;
@@ -52,17 +33,47 @@ export async function GET(request: Request) {
       throw error;
     }
 
-    console.log(`✅ Found ${products?.length || 0} products`);
+    // Fetch images and size charts for each product
+    const productsWithDetails = await Promise.all(
+      (products || []).map(async (product) => {
+        // Fetch product images
+        const { data: images } = await supabase
+          .from('product_images')
+          .select('*')
+          .eq('product_id', product.id)
+          .order('display_order', { ascending: true });
 
-    return NextResponse.json(products || [], {
+        // Fetch size chart if has_size_chart is true
+        let sizeChart = [];
+        if (product.has_size_chart) {
+          const { data: chart } = await supabase
+            .from('size_charts')
+            .select('*')
+            .eq('product_id', product.id)
+            .order('size', { ascending: true });
+          
+          sizeChart = chart || [];
+        }
+
+        return {
+          ...product,
+          images: images || [],
+          size_chart: sizeChart,
+        };
+      })
+    );
+
+    console.log(`✅ Found ${productsWithDetails.length} products`);
+
+    return NextResponse.json(productsWithDetails, {
       status: 200,
       headers: {
-        'Cache-Control': 'no-store, must-revalidate'
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30'
       }
     });
 
   } catch (error: any) {
-    console.error('❌ Admin Products API Error:', error);
+    console.error('❌ Public Products API Error:', error);
     
     return NextResponse.json(
       {
@@ -73,7 +84,6 @@ export async function GET(request: Request) {
     );
   }
 }
-
 // POST - Create new product
 export async function POST(request: Request) {
   try {
