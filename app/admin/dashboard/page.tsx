@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Package,
@@ -26,6 +27,7 @@ import CategoryManagement from '../CategoriesManagement';
 import ExchangeManagement from '../ExchangeManagement';
 import StockAlerts from '../StockAlerts';
 export default function AdminDashboard() {
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [adminName, setAdminName] = useState('Admin User');
@@ -42,6 +44,26 @@ export default function AdminDashboard() {
     { id: 'stocks', label: 'Stock Alerts', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
+
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('/api/admin/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        // Redirect to login page after successful logout
+        router.push('/admin/login');
+      } else {
+        console.error('Logout failed');
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
 
   const renderContent = () => {
     switch (activeMenu) {
@@ -133,7 +155,10 @@ export default function AdminDashboard() {
           </ul>
 
           <div className="pt-4 mt-4 border-t border-gray-200">
-            <button className="flex items-center w-full p-3 text-gray-700 rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors">
+            <button 
+              onClick={handleLogout}
+              className="flex items-center w-full p-3 text-gray-700 rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors"
+            >
               <LogOut className="w-5 h-5" />
               <span className="ml-3">Logout</span>
             </button>

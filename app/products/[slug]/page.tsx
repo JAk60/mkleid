@@ -1,4 +1,4 @@
-// app/products/[slug]/page.tsx - UPDATED WITH QUANTITY CONTROLS
+// app/products/[slug]/page.tsx - FIXED VERSION WITH PROPER COLOR HANDLING
 
 'use client';
 
@@ -18,7 +18,7 @@ export default function ProductDetailPage() {
     const params = useParams();
     const router = useRouter();
     const slug = params.slug as string;
-    const { addItem, isInCart } = useCart();
+    const { addItem, isInCart, getCartItemQuantity } = useCart();
 
     const [product, setProduct] = useState<Product | null>(null);
     const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
@@ -46,8 +46,18 @@ export default function ProductDetailPage() {
                 }
 
                 setProduct(foundProduct);
+                
+                // Set default size and color
                 setSelectedSize(foundProduct.sizes[0] || '');
-                setSelectedColor(foundProduct.colors[0] || '');
+                
+                // Handle color - get first color value
+                const firstColor = foundProduct.colors[0];
+                const colorValue = typeof firstColor === 'string' 
+                    ? firstColor 
+                    : (firstColor && typeof firstColor === 'object' && 'hex' in firstColor)
+                        ? (firstColor as { hex: string }).hex
+                        : 'Black';
+                setSelectedColor(colorValue);
 
                 // Get related products from same category
                 const related = productsWithSlugs
@@ -66,17 +76,52 @@ export default function ProductDetailPage() {
         fetchProduct();
     }, [slug, router]);
 
+    // Reset quantity when size or color changes
+    useEffect(() => {
+        if (product && selectedSize && selectedColor) {
+            const itemInCart = getCartItemQuantity(product.id, selectedSize, selectedColor);
+            if (itemInCart > 0) {
+                setQuantity(1); // Reset to 1 when changing to variant already in cart
+            }
+        }
+    }, [selectedSize, selectedColor, product, getCartItemQuantity]);
+
     const handleQuantityChange = (change: number) => {
         const newQuantity = quantity + change;
 
         if (newQuantity < 1) return;
 
-        if (product && product.stock > 0 && newQuantity > product.stock) {
-            toast.error(`Only ${product.stock} items available in stock`);
-            return;
+        if (product && product.stock > 0) {
+            // Check total quantity (in cart + new quantity)
+            const itemInCart = getCartItemQuantity(product.id, selectedSize, selectedColor);
+            const totalQuantity = itemInCart + newQuantity;
+            
+            if (totalQuantity > product.stock) {
+                toast.error(`Only ${product.stock} items available in stock`);
+                return;
+            }
         }
 
         setQuantity(newQuantity);
+    };
+
+    const handleColorChange = (color: any) => {
+        // Get color value
+        const colorValue = typeof color === 'string' 
+            ? color 
+            : (color && typeof color === 'object' && 'hex' in color)
+                ? (color as { hex: string }).hex
+                : 'Black';
+        
+        setSelectedColor(colorValue);
+        // Reset quantity when color changes
+        setQuantity(1);
+    };
+
+    const handleSizeChange = (size: string) => {
+        setSelectedSize(size);
+        // Reset quantity when size changes
+        setQuantity(1);
     };
 
     const handleAddToCart = () => {
@@ -97,8 +142,12 @@ export default function ProductDetailPage() {
             return;
         }
 
-        if (quantity > product.stock) {
-            toast.error(`Only ${product.stock} items available`);
+        // Check stock including items already in cart
+        const itemInCart = getCartItemQuantity(product.id, selectedSize, selectedColor);
+        const totalQuantity = itemInCart + quantity;
+        
+        if (totalQuantity > product.stock) {
+            toast.error(`Only ${product.stock - itemInCart} more items available`);
             return;
         }
 
@@ -117,8 +166,10 @@ export default function ProductDetailPage() {
             });
         }
 
-        toast.success(`Added ${quantity} × ${product.name} to cart!`, {
+        const itemDescription = `${quantity} × ${product.name} (${selectedSize}, ${selectedColor})`;
+        toast.success(`Added ${itemDescription} to cart!`, {
             icon: '🛒',
+            duration: 3000,
         });
 
         // Reset adding state and quantity after animation
@@ -126,6 +177,37 @@ export default function ProductDetailPage() {
             setIsAdding(false);
             setQuantity(1);
         }, 600);
+    };
+
+    // Helper to get color hex
+    const getColorHex = (color: any): string => {
+        if (typeof color === 'string') {
+            return color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase();
+        } else if (color && typeof color === 'object' && 'hex' in color) {
+            return (color as { hex: string }).hex;
+        }
+        return '#000000';
+    };
+
+    // Helper to get color name/value
+    const getColorValue = (color: any): string => {
+        if (typeof color === 'string') {
+            return color;
+        } else if (color && typeof color === 'object' && 'hex' in color) {
+            return (color as { hex: string }).hex;
+        }
+        return 'Unknown';
+    };
+
+    // Helper to get color display name
+    const getColorName = (color: any): string => {
+        if (typeof color === 'string') {
+            return color;
+        } else if (color && typeof color === 'object') {
+            const colorObj = color as { name?: string; hex: string };
+            return colorObj.name || colorObj.hex;
+        }
+        return 'Unknown';
     };
 
     if (loading) {
@@ -145,7 +227,8 @@ export default function ProductDetailPage() {
 
     const categorySlug = generateCategorySlug(product.category);
     const isOutOfStock = product.stock === 0;
-    const inCart = isInCart(product.id, selectedSize);
+    const inCart = isInCart(product.id, selectedSize, selectedColor);
+    const cartQuantity = getCartItemQuantity(product.id, selectedSize, selectedColor);
 
     // Prepare images array (support for future multiple images)
     const images = product.images && product.images.length > 0
@@ -198,7 +281,7 @@ export default function ProductDetailPage() {
                                 sizes="(max-width: 1024px) 100vw, 50vw"
                             />
                             {isOutOfStock && (
-                                <div className="absolute inset-0 bg-[#E3D9C6]/50 flex items-center justify-center">
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                                     <span className="text-white font-semibold text-2xl">Out of Stock</span>
                                 </div>
                             )}
@@ -211,8 +294,9 @@ export default function ProductDetailPage() {
                                     <button
                                         key={index}
                                         onClick={() => setSelectedImage(index)}
-                                        className={`relative aspect-square rounded-lg overflow-hidden ${selectedImage === index ? 'ring-2 ring-gray-900' : 'ring-1 ring-gray-200'
-                                            }`}
+                                        className={`relative aspect-square rounded-lg overflow-hidden ${
+                                            selectedImage === index ? 'ring-2 ring-gray-900' : 'ring-1 ring-gray-200'
+                                        }`}
                                     >
                                         <Image
                                             src={img || '/placeholder-product.jpg'}
@@ -248,6 +332,11 @@ export default function ProductDetailPage() {
                                     In stock
                                 </p>
                             )}
+                            {cartQuantity > 0 && (
+                                <p className="text-blue-600 font-medium text-sm mt-1">
+                                    {cartQuantity} already in cart
+                                </p>
+                            )}
                         </div>
 
                         {/* Size Selection */}
@@ -259,12 +348,13 @@ export default function ProductDetailPage() {
                                 {product.sizes.map((size) => (
                                     <button
                                         key={size}
-                                        onClick={() => setSelectedSize(size)}
+                                        onClick={() => handleSizeChange(size)}
                                         disabled={isOutOfStock}
-                                        className={`px-6 py-3 border rounded-lg font-medium transition-all ${selectedSize === size
-                                            ? 'bg-gray-900 text-white border-gray-900'
-                                            : 'bg-[#E3D9C6] text-gray-900 border-gray-300 hover:border-gray-900'
-                                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                        className={`px-6 py-3 border rounded-lg font-medium transition-all ${
+                                            selectedSize === size
+                                                ? 'bg-gray-900 text-white border-gray-900'
+                                                : 'bg-[#E3D9C6] text-gray-900 border-gray-300 hover:border-gray-900'
+                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
                                     >
                                         {size}
                                     </button>
@@ -275,28 +365,36 @@ export default function ProductDetailPage() {
                         {/* Color Selection */}
                         <div>
                             <label className="block text-sm font-medium mb-3">
-                                Color: <span className="font-normal text-gray-600">{selectedColor}</span>
+                                Color: <span className="font-normal text-gray-600">
+                                    {getColorName(product.colors.find(c => getColorValue(c) === selectedColor))}
+                                </span>
                             </label>
                             <div className="flex flex-wrap gap-3">
-                                {product.colors.map((color) => (
-                                    <button
-                                        key={color}
-                                        onClick={() => setSelectedColor(color)}
-                                        disabled={isOutOfStock}
-                                        className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-all ${selectedColor === color
-                                            ? 'border-gray-900 ring-2 ring-gray-900'
-                                            : 'border-gray-300 hover:border-gray-900'
+                                {product.colors.map((color, index) => {
+                                    const colorValue = getColorValue(color);
+                                    const colorHex = getColorHex(color);
+                                    const colorName = getColorName(color);
+                                    const isSelected = selectedColor === colorValue;
+
+                                    return (
+                                        <button
+                                            key={index}
+                                            onClick={() => handleColorChange(color)}
+                                            disabled={isOutOfStock}
+                                            className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-all ${
+                                                isSelected
+                                                    ? 'border-gray-900 ring-2 ring-gray-900'
+                                                    : 'border-gray-300 hover:border-gray-900'
                                             } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                    >
-                                        <div
-                                            className="w-6 h-6 rounded-full border border-gray-300"
-                                            style={{
-                                                backgroundColor: color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase()
-                                            }}
-                                        />
-                                        <span className="text-sm font-medium">{color}</span>
-                                    </button>
-                                ))}
+                                        >
+                                            <div
+                                                className="w-6 h-6 rounded-full border border-gray-300"
+                                                style={{ backgroundColor: colorHex }}
+                                            />
+                                            <span className="text-sm font-medium">{colorName}</span>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 
@@ -319,7 +417,7 @@ export default function ProductDetailPage() {
                                     </span>
                                     <button
                                         onClick={() => handleQuantityChange(1)}
-                                        disabled={isOutOfStock || (product.stock > 0 && quantity >= product.stock)}
+                                        disabled={isOutOfStock || (product.stock > 0 && (cartQuantity + quantity) >= product.stock)}
                                         className="px-4 py-3 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                     >
                                         <Plus className="w-4 h-4" />
@@ -327,7 +425,7 @@ export default function ProductDetailPage() {
                                 </div>
                                 {product.stock > 0 && product.stock <= 10 && (
                                     <span className="text-sm text-gray-600">
-                                        Max: {product.stock} available
+                                        Max: {product.stock - cartQuantity} available
                                     </span>
                                 )}
                             </div>
@@ -338,12 +436,13 @@ export default function ProductDetailPage() {
                             <button
                                 onClick={handleAddToCart}
                                 disabled={isOutOfStock || isAdding}
-                                className={`w-full py-4 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 ${isOutOfStock
-                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                    : inCart
+                                className={`w-full py-4 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 ${
+                                    isOutOfStock
+                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        : inCart
                                         ? 'bg-green-600 hover:bg-green-700 text-white'
                                         : 'bg-gray-900 hover:bg-gray-800 text-white'
-                                    } ${isAdding ? 'scale-95' : 'scale-100'}`}
+                                } ${isAdding ? 'scale-95' : 'scale-100'}`}
                             >
                                 {isOutOfStock ? (
                                     'Out of Stock'
@@ -355,7 +454,7 @@ export default function ProductDetailPage() {
                                 ) : inCart ? (
                                     <>
                                         <Check className="w-5 h-5" />
-                                        Added to Cart
+                                        Add More to Cart
                                     </>
                                 ) : (
                                     <>

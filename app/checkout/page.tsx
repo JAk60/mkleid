@@ -1,4 +1,4 @@
-// app/checkout/page.tsx - IMPROVED WITH ERROR HANDLING
+// app/checkout/page.tsx - UPDATED (Tax Inclusive)
 
 "use client"
 
@@ -34,9 +34,9 @@ export default function CheckoutPage() {
     is_default: false,
   })
 
-  const tax = total * 0.18
+  // No separate tax calculation - prices are inclusive
   const shippingCost = 0
-  const finalTotal = total + tax + shippingCost
+  const finalTotal = total + shippingCost
 
   useEffect(() => {
     if (isLoggedIn && user) {
@@ -126,7 +126,7 @@ export default function CheckoutPage() {
         throw new Error("Failed to load payment gateway. Please check your internet connection and try again.");
       }
 
-      // 2. Create order in database first
+      // 2. Create order in database - no separate tax field
       const orderData = {
         user_id: user.id,
         items: items.map(item => ({
@@ -134,13 +134,13 @@ export default function CheckoutPage() {
           product_name: item.name,
           product_image: item.image,
           size: item.size,
-          color: item.color || "Black",
+          color: item.color,
           quantity: item.quantity,
           price: item.price,
           subtotal: item.price * item.quantity
         })),
         subtotal: total,
-        tax,
+        tax: 0, // Tax is included in product prices
         shipping_cost: shippingCost,
         total: finalTotal,
         shipping_address: selectedAddress,
@@ -526,29 +526,30 @@ export default function CheckoutPage() {
             <h2 className="text-2xl font-bold mb-6">Order Summary</h2>
             <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
               {items.map((item) => (
-                <div key={`${item.id}-${item.size}`} className="flex justify-between text-sm">
-                  <span>
-                    {item.name} (Size {item.size}) x{item.quantity}
+                <div key={`${item.id}-${item.size}-${item.color}`} className="flex justify-between text-sm gap-2">
+                  <span className="flex-1">
+                    {item.name} 
+                    <span className="text-muted-foreground"> (Size {item.size}, {item.color}) </span>
+                    x{item.quantity}
                   </span>
-                  <span className="font-semibold">₹{(item.price * item.quantity).toFixed(2)}</span>
+                  <span className="font-semibold ml-2 whitespace-nowrap">₹{(item.price * item.quantity).toFixed(2)}</span>
                 </div>
               ))}
             </div>
-            <div className="border-t border-border pt-4 space-y-2">
+            <div className="border-t border-border pt-4 space-y-3">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span>₹{total.toFixed(2)}</span>
+                <span className="font-semibold">₹{total.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Shipping</span>
-                <span>Free</span>
+                <span className="font-semibold text-green-600">Free</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Tax (18%)</span>
-                <span>₹{tax.toFixed(2)}</span>
-              </div>
-              <div className="border-t border-border pt-4 flex justify-between">
-                <span className="font-bold">Total</span>
+              <div className="border-t border-border pt-4 flex justify-between items-end">
+                <div>
+                  <span className="font-bold text-lg block">Total</span>
+                  <span className="text-xs text-muted-foreground">All taxes included</span>
+                </div>
                 <span className="text-2xl font-bold text-primary">₹{finalTotal.toFixed(2)}</span>
               </div>
             </div>

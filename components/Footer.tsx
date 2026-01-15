@@ -122,7 +122,7 @@ const Footer = () => {
         <div className="border-t border-gray-800 pt-8">
           <Link href="/">
             <Image
-              src="/logo1.png"
+              src="/logo4.png"
               alt="Logo"
               width={320}
               height={60}
