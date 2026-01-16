@@ -1,8 +1,8 @@
-// components/FilterSidebar.tsx
+// components/products/FilterSidebar.tsx - FINAL VERSION
 
 'use client';
 
-import { FilterState, CATEGORIES, ALL_SIZES } from '@/lib/types';
+import { FilterState, ALL_SIZES } from '@/lib/types';
 import { X } from 'lucide-react';
 
 interface FilterSidebarProps {
@@ -11,6 +11,7 @@ interface FilterSidebarProps {
   availableColors: (string | { name: string; hex: string })[];
   priceRange: [number, number];
   onReset: () => void;
+  availableCategories?: string[]; // NEW: Optional prop for dynamic categories
 }
 
 // Helper function to get color hex value
@@ -28,14 +29,15 @@ export default function FilterSidebar({
   onChange,
   availableColors,
   priceRange,
-  onReset
+  onReset,
+  availableCategories // NEW
 }: FilterSidebarProps) {
 
   const handleGenderChange = (gender: string) => {
     const newGenders = filters.gender.includes(gender)
       ? filters.gender.filter(g => g !== gender)
       : [...filters.gender, gender];
-    onChange({ ...filters, gender: newGenders, categories: [] }); // Reset categories when gender changes
+    onChange({ ...filters, gender: newGenders, categories: [] });
   };
 
   const handleCategoryChange = (category: string) => {
@@ -58,17 +60,6 @@ export default function FilterSidebar({
       ? filters.colors.filter(c => c !== colorValue)
       : [...filters.colors, colorValue];
     onChange({ ...filters, colors: newColors });
-  };
-
-  const getAvailableCategories = () => {
-    if (filters.gender.length === 0) {
-      return [...CATEGORIES.Male?.map(c => ({ name: c, gender: 'Male' })),
-      ...CATEGORIES.Female?.map(c => ({ name: c, gender: 'Female' }))];
-    }
-
-    return filters.gender.flatMap(g =>
-      CATEGORIES[g as 'Male' | 'Female']?.map(c => ({ name: c, gender: g }))
-    );
   };
 
   const hasActiveFilters =
@@ -96,44 +87,45 @@ export default function FilterSidebar({
         )}
       </div>
 
-      {/* Gender Filter */}
-      <div className="border-b pb-6">
-        <h3 className="font-medium mb-3">Gender</h3>
-        <div className="space-y-2">
-          {['Male', 'Female'].map(gender => (
-            <label key={gender} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={filters.gender.includes(gender)}
-                onChange={() => handleGenderChange(gender)}
-                className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
-              />
-              <span className="text-sm">{gender === 'Male' ? 'Mens' : 'Womens'}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* Category Filter */}
-      <div className="border-b pb-6">
-        <h3 className="font-medium mb-3">Category</h3>
-        <div className="space-y-2 max-h-48 overflow-y-auto">
-          {getAvailableCategories()?.map(({ name, gender }) => {
-            const categoryKey = `${gender}-${name}`;
-            return (
-              <label key={categoryKey} className="flex items-center gap-2 cursor-pointer">
+      {/* Gender Filter - Only show if not pre-filtered */}
+      {(!filters.gender.length || filters.gender.length < 2) && (
+        <div className="border-b pb-6">
+          <h3 className="font-medium mb-3">Gender</h3>
+          <div className="space-y-2">
+            {['Male', 'Female'].map(gender => (
+              <label key={gender} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={filters.categories.includes(categoryKey)}
-                  onChange={() => handleCategoryChange(categoryKey)}
+                  checked={filters.gender.includes(gender)}
+                  onChange={() => handleGenderChange(gender)}
                   className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
                 />
-                <span className="text-sm">{name}</span>
+                <span className="text-sm">{gender === 'Male' ? 'Mens' : 'Womens'}</span>
               </label>
-            );
-          })}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Category Filter - Use dynamic categories if provided */}
+      {availableCategories && availableCategories.length > 0 && (
+        <div className="border-b pb-6">
+          <h3 className="font-medium mb-3">Category</h3>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {availableCategories.map((category) => (
+              <label key={category} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filters.categories.includes(category)}
+                  onChange={() => handleCategoryChange(category)}
+                  className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                />
+                <span className="text-sm">{category}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Price Range Filter */}
       <div className="border-b pb-6">
@@ -180,13 +172,13 @@ export default function FilterSidebar({
       <div className="border-b pb-6">
         <h3 className="font-medium mb-3">Colors</h3>
         <div className="flex flex-wrap gap-2">
-          {availableColors.map(color => {
+          {availableColors.map((color, idx) => {
             const colorValue = typeof color === 'string' ? color : color.name || color.hex;
             const colorHex = getColorHex(color);
             
             return (
               <button
-                key={colorValue}
+                key={`color-${colorValue}-${idx}`}
                 onClick={() => handleColorChange(color)}
                 className={`flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md transition-colors ${filters.colors.includes(colorValue)
                   ? 'bg-gray-900 text-white border-gray-900'

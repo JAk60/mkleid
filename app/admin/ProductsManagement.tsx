@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Plus, Edit, Trash2, X, Save, Search, Upload, Image as ImageIcon, Ruler, ChevronUp, ChevronDown } from "lucide-react";
+import { Category } from "@/lib/categories-db";
 
 interface ColorOption {
   name: string;
@@ -38,10 +39,6 @@ interface Product {
   size_chart?: SizeChart[];
 }
 
-const CATEGORIES = {
-  Male: ["Oversized tshirt", "Jersey", "Sweatshirt", "Shirts", "Sweatpants"],
-  Female: ["Baby tees", "Jersey", "Oversized tshirt", "Shirts", "Sweatshirts", "Sweatpants", "Flared pants"],
-};
 
 const SIZES = ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 
@@ -77,7 +74,8 @@ export default function ProductsManagement() {
   const [colorHexInput, setColorHexInput] = useState("");
   const [showPresets, setShowPresets] = useState(false);
   const [cloudinaryLoaded, setCloudinaryLoaded] = useState(false);
-
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
   const [uploadingImageIndex, setUploadingImageIndex] = useState<number | null>(null);
 
@@ -86,7 +84,21 @@ export default function ProductsManagement() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const fetchCategories = async () => {
+    try {
+      setLoadingCategories(true);
+      const response = await fetch('/api/categories');
+      const data = await response.json();
 
+      if (data.success) {
+        setCategories(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to load categories:', error);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
   const [formData, setFormData] = useState<Product>({
     name: "",
     description: "",
@@ -99,12 +111,12 @@ export default function ProductsManagement() {
     gender: "Male",
     has_size_chart: false,
   });
+  const getCategoriesByGender = (gender: 'Male' | 'Female') => {
+    return categories.filter(cat => cat.gender === gender);
+  };
 
-  useEffect(() => {
-    fetchProducts();
-    loadCloudinaryScript();
-  }, []);
-
+  const availableCategories = getCategoriesByGender(formData.gender);
+  
   const loadCloudinaryScript = () => {
     if ((window as any).cloudinary) {
       setCloudinaryLoaded(true);
@@ -137,10 +149,29 @@ export default function ProductsManagement() {
     if (product) {
       setEditingProduct(product);
       setFormData(product);
-      setProductImages(product.images || [{ image_url: product.image_url, display_order: 0, is_primary: true }]);
+      
+      // FIX: Properly load existing images when editing
+      if (product.images && product.images.length > 0) {
+        // Product has multiple images in product_images table
+        console.log('📸 Loading product images:', product.images);
+        setProductImages(product.images);
+      } else if (product.image_url) {
+        // Fallback: Product only has main image_url
+        console.log('📸 Loading single image from image_url');
+        setProductImages([{
+          image_url: product.image_url,
+          display_order: 0,
+          is_primary: true
+        }]);
+      } else {
+        // No images at all
+        setProductImages([]);
+      }
+      
       setSizeChart(product.size_chart || []);
       setShowSizeChart(product.has_size_chart || false);
     } else {
+      // Creating new product
       setEditingProduct(null);
       setFormData({
         name: "",
@@ -158,12 +189,18 @@ export default function ProductsManagement() {
       setSizeChart([]);
       setShowSizeChart(false);
     }
+
     setColorNameInput("");
     setColorHexInput("");
     setShowPresets(false);
     setShowModal(true);
   };
 
+  useEffect(() => {
+   fetchProducts();
+   fetchCategories(); // ADD THIS LINE
+   loadCloudinaryScript();
+ }, []);
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingProduct(null);
@@ -214,7 +251,7 @@ export default function ProductsManagement() {
 
         if (result?.event === "success") {
           const imageUrl = result.info.secure_url;
-          
+
           if (imageIndex !== undefined) {
             const newImages = [...productImages];
             newImages[imageIndex] = { ...newImages[imageIndex], image_url: imageUrl };
@@ -227,11 +264,11 @@ export default function ProductsManagement() {
             };
             setProductImages([...productImages, newImage]);
           }
-          
+
           if (productImages.length === 0 || imageIndex === 0) {
             setFormData(prev => ({ ...prev, image_url: imageUrl }));
           }
-          
+
           setUploading(false);
           setUploadingImageIndex(null);
           widget.close();
@@ -250,15 +287,15 @@ export default function ProductsManagement() {
   const moveImage = (index: number, direction: "up" | "down") => {
     const newImages = [...productImages];
     const targetIndex = direction === "up" ? index - 1 : index + 1;
-    
+
     if (targetIndex < 0 || targetIndex >= newImages.length) return;
-    
+
     [newImages[index], newImages[targetIndex]] = [newImages[targetIndex], newImages[index]];
     newImages[index].display_order = index;
     newImages[targetIndex].display_order = targetIndex;
-    
+
     setProductImages(newImages);
-    
+
     if (newImages[0].is_primary) {
       setFormData(prev => ({ ...prev, image_url: newImages[0].image_url }));
     }
@@ -271,7 +308,7 @@ export default function ProductsManagement() {
       if (i === 0) img.is_primary = true;
     });
     setProductImages(newImages);
-    
+
     if (newImages.length > 0) {
       setFormData(prev => ({ ...prev, image_url: newImages[0].image_url }));
     }
@@ -359,9 +396,9 @@ export default function ProductsManagement() {
     const newSizes = formData.sizes.includes(size)
       ? formData.sizes.filter(s => s !== size)
       : [...formData.sizes, size];
-    
+
     setFormData(prev => ({ ...prev, sizes: newSizes }));
-    
+
     if (showSizeChart) {
       if (newSizes.includes(size) && !sizeChart.find(s => s.size === size)) {
         setSizeChart([...sizeChart, { size, notes: "" }]);
@@ -396,7 +433,7 @@ export default function ProductsManagement() {
       alert("Please upload at least one product image");
       return;
     }
-    
+
     if (showSizeChart && sizeChart.length > 0) {
       const isValid = sizeChart.every(s => {
         if (formData.gender === "Male") {
@@ -405,7 +442,7 @@ export default function ProductsManagement() {
           return s.bust && s.length_female;
         }
       });
-      
+
       if (!isValid) {
         alert(`Please fill all size chart measurements for ${formData.gender === "Male" ? "Chest and Length" : "Bust and Length"}`);
         return;
@@ -561,9 +598,8 @@ export default function ProductsManagement() {
                 </div>
                 <div className="mt-3 flex items-center gap-4 flex-wrap">
                   <span className="font-bold text-blue-600 text-lg">₹{product.price.toLocaleString()}</span>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    product.gender === 'Male' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'
-                  }`}>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${product.gender === 'Male' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'
+                    }`}>
                     {product.gender}
                   </span>
                   {product.has_size_chart && (
@@ -598,9 +634,8 @@ export default function ProductsManagement() {
             <button
               key={i}
               onClick={() => setCurrentPage(i + 1)}
-              className={`px-4 py-2 border rounded transition ${
-                currentPage === i + 1 ? "bg-blue-600 text-white" : "hover:bg-gray-100"
-              }`}
+              className={`px-4 py-2 border rounded transition ${currentPage === i + 1 ? "bg-blue-600 text-white" : "hover:bg-gray-100"
+                }`}
             >
               {i + 1}
             </button>
@@ -669,8 +704,8 @@ export default function ProductsManagement() {
                     className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Category</option>
-                    {CATEGORIES[formData.gender].map(c => (
-                      <option key={c} value={c}>{c}</option>
+                    {availableCategories.map(c => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
                     ))}
                   </select>
                 </div>
@@ -702,18 +737,18 @@ export default function ProductsManagement() {
 
               <div>
                 <label className="block font-medium mb-3">Product Images * (Multiple)</label>
-                
+
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                   {productImages.map((img, index) => (
                     <div key={index} className="relative border-2 border-gray-300 rounded-lg overflow-hidden group">
                       <img src={img.image_url} alt={`Product ${index + 1}`} className="w-full h-48 object-cover" />
-                      
+
                       {img.is_primary && (
                         <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded font-semibold">
                           Primary
                         </div>
                       )}
-                      
+
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
                         <button
                           onClick={() => moveImage(index, "up")}
@@ -766,11 +801,10 @@ export default function ProductsManagement() {
                       key={s}
                       type="button"
                       onClick={() => toggleSize(s)}
-                      className={`px-4 py-2 border rounded-lg transition ${
-                        formData.sizes.includes(s)
+                      className={`px-4 py-2 border rounded-lg transition ${formData.sizes.includes(s)
                           ? "bg-blue-600 text-white border-blue-600"
                           : "bg-white hover:bg-gray-50"
-                      }`}
+                        }`}
                     >
                       {s}
                     </button>
@@ -814,7 +848,7 @@ export default function ProductsManagement() {
                         <span>📏 Fill measurements: <strong>Bust</strong> and <strong>Length</strong> (in inches)</span>
                       )}
                     </div>
-                    
+
                     {sizeChart.length === 0 ? (
                       <p className="text-gray-500 text-sm">Select sizes above to add to size chart</p>
                     ) : (
@@ -822,7 +856,7 @@ export default function ProductsManagement() {
                         {sizeChart.map((item, index) => (
                           <div key={item.size} className="bg-white p-4 rounded border">
                             <h4 className="font-bold mb-3 text-lg">{item.size}</h4>
-                            
+
                             {formData.gender === "Male" ? (
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
@@ -874,7 +908,7 @@ export default function ProductsManagement() {
                                 </div>
                               </div>
                             )}
-                            
+
                             <div className="mt-3">
                               <label className="block text-sm font-medium mb-1">Notes (optional)</label>
                               <input
@@ -895,7 +929,7 @@ export default function ProductsManagement() {
 
               <div>
                 <label className="block font-medium mb-2">Colors *</label>
-                
+
                 {formData.colors.length > 0 && (
                   <div className="flex gap-2 flex-wrap mb-3">
                     {formData.colors.map((c) => (

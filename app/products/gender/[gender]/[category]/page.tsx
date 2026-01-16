@@ -1,4 +1,4 @@
-// app/products/gender/[gender]/[category]/page.tsx
+// app/products/gender/[gender]/[category]/page.tsx - FIXED VERSION
 
 'use client';
 
@@ -16,9 +16,8 @@ import {
   urlGenderToDbGender,
   dbGenderToUrlGender,
   dbGenderToDisplayName,
-  urlCategoryToDbCategory,
   dbCategoryToDisplayName,
-  getProductsByGenderAndCategory
+  extractCategoryFromSlug, // Import the helper
 } from '@/utils/helpers';
 import ProductCard from '@/components/products/ProductCard';
 import FilterSidebar from '@/components/products/FilterSidebar';
@@ -52,7 +51,7 @@ export default function GenderCategoryPage() {
   useEffect(() => {
     async function fetchProducts() {
       try {
-        // Convert URL gender to DB gender using helper
+        // Convert URL gender to DB gender
         const genderValue = urlGenderToDbGender(genderParam);
 
         console.log('🔍 Gender from URL:', genderParam, '→', genderValue);
@@ -65,8 +64,8 @@ export default function GenderCategoryPage() {
 
         setGender(genderValue);
 
-        // Convert category slug to DB format using helper
-        const dbCategory = urlCategoryToDbCategory(categorySlug);
+        // Extract category name from slug
+        const dbCategory = extractCategoryFromSlug(categorySlug);
         console.log('🔍 Category from URL:', categorySlug, '→', dbCategory);
         setCategoryName(dbCategory);
 
@@ -77,23 +76,46 @@ export default function GenderCategoryPage() {
         const productsWithSlugs = products.map(addSlugToProduct);
         setAllProducts(productsWithSlugs);
 
-        // Use helper to get products by gender and category
-        const filtered = getProductsByGenderAndCategory(productsWithSlugs, genderValue, dbCategory);
-
-        // Debug logging
+        // Debug logging BEFORE filtering
         console.log('🔥 ALL UNIQUE CATEGORIES:', [...new Set(productsWithSlugs.map(p => p.category))]);
         console.log('🔥 ALL UNIQUE GENDERS:', [...new Set(productsWithSlugs.map(p => p.gender))]);
         console.log('🔥 LOOKING FOR - Gender:', genderValue, '| Category:', dbCategory);
-        console.log('✅ Filtered products:', filtered.length);
+        
+        // Show all Female products with their categories
+        const femaleProducts = productsWithSlugs.filter(p => p.gender === 'Female');
+        console.log('👗 All Female products and their categories:');
+        femaleProducts.forEach(p => {
+          console.log(`  - "${p.name}" → category: "${p.category}" (length: ${p.category.length})`);
+        });
+        
+        // Filter by gender AND category
+        const filtered = productsWithSlugs.filter(p => 
+          p.gender === genderValue && p.category === dbCategory
+        );
 
-        // REMOVED AUTO-REDIRECT - Just set the products (even if empty)
+        console.log('✅ Filtered products:', filtered.length);
+        
+        if (filtered.length > 0) {
+          console.log('Sample filtered product:', filtered[0]);
+        } else {
+          console.log('❌ NO MATCHES - Trying exact string comparison:');
+          console.log(`  Looking for category exactly matching: "${dbCategory}"`);
+          const possibleMatches = productsWithSlugs.filter(p => 
+            p.gender === genderValue && p.category.toLowerCase().includes('baby')
+          );
+          console.log('  Products with "baby" in category:', possibleMatches.length);
+          if (possibleMatches.length > 0) {
+            console.log('  Example:', possibleMatches[0].category);
+          }
+        }
+
         setCategoryProducts(filtered);
 
         // Set initial price range and pre-select the gender + category
         const range = filtered.length > 0 ? getPriceRange(filtered) : [0, 100];
         setFilters(prev => ({
           ...prev,
-          priceRange: range,
+          priceRange: range as [number, number],
           gender: [genderValue],
           categories: [dbCategory]
         }));
@@ -118,7 +140,7 @@ export default function GenderCategoryPage() {
     setFilters({
       gender: gender ? [gender] : [],
       categories: categoryName ? [categoryName] : [],
-      priceRange: priceRange,
+      priceRange: priceRange as [number, number],
       sizes: [],
       colors: [],
       inStock: false,
@@ -144,7 +166,7 @@ export default function GenderCategoryPage() {
 
   // Use helpers for display names
   const genderDisplayName = dbGenderToDisplayName(gender);
-  const categoryDisplayName = dbCategoryToDisplayName(categoryName);
+  const categoryDisplayName = categoryName; // Already in display format from extractCategoryFromSlug
   const genderUrlSlug = dbGenderToUrlGender(gender);
 
   return (
@@ -223,8 +245,9 @@ export default function GenderCategoryPage() {
                 filters={filters}
                 onChange={setFilters}
                 availableColors={availableColors}
-                priceRange={priceRange}
+                priceRange={priceRange as [number, number]}
                 onReset={handleResetFilters}
+                availableCategories={[categoryName]}
               />
             </div>
           </aside>
@@ -249,8 +272,9 @@ export default function GenderCategoryPage() {
                   filters={filters}
                   onChange={setFilters}
                   availableColors={availableColors}
-                  priceRange={priceRange}
+                  priceRange={priceRange as [number, number]}
                   onReset={handleResetFilters}
+                  availableCategories={[categoryName]}
                 />
               </div>
             </div>

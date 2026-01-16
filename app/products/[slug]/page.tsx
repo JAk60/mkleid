@@ -1,4 +1,4 @@
-// app/products/[slug]/page.tsx - Updated with Multiple Images & Size Chart
+// app/products/[slug]/page.tsx - Complete code with vertical thumbnail gallery
 
 'use client';
 
@@ -44,12 +44,12 @@ export default function ProductDetailPage() {
                 }
 
                 setProduct(foundProduct);
-                
+
                 setSelectedSize(foundProduct.sizes[0] || '');
-                
+
                 const firstColor = foundProduct.colors[0];
-                const colorValue = typeof firstColor === 'string' 
-                    ? firstColor 
+                const colorValue = typeof firstColor === 'string'
+                    ? firstColor
                     : (firstColor && typeof firstColor === 'object' && 'hex' in firstColor)
                         ? (firstColor as { hex: string }).hex
                         : 'Black';
@@ -88,7 +88,7 @@ export default function ProductDetailPage() {
         if (product && product.stock > 0) {
             const itemInCart = getCartItemQuantity(product.id, selectedSize, selectedColor);
             const totalQuantity = itemInCart + newQuantity;
-            
+
             if (totalQuantity > product.stock) {
                 toast.error(`Only ${product.stock} items available in stock`);
                 return;
@@ -99,12 +99,12 @@ export default function ProductDetailPage() {
     };
 
     const handleColorChange = (color: any) => {
-        const colorValue = typeof color === 'string' 
-            ? color 
+        const colorValue = typeof color === 'string'
+            ? color
             : (color && typeof color === 'object' && 'hex' in color)
                 ? (color as { hex: string }).hex
                 : 'Black';
-        
+
         setSelectedColor(colorValue);
         setQuantity(1);
     };
@@ -134,7 +134,7 @@ export default function ProductDetailPage() {
 
         const itemInCart = getCartItemQuantity(product.id, selectedSize, selectedColor);
         const totalQuantity = itemInCart + quantity;
-        
+
         if (totalQuantity > product.stock) {
             toast.error(`Only ${product.stock - itemInCart} more items available`);
             return;
@@ -216,8 +216,11 @@ export default function ProductDetailPage() {
 
     // Use product images if available, otherwise fallback to image_url
     const images = product.images && product.images.length > 0
-        ? product.images
+        ? product.images.map(img => typeof img === 'string' ? img : (img as { image_url: string }).image_url)
         : [product.image_url];
+
+    console.log('🖼️ Product images:', images);
+    console.log('📦 Full product data:', product);
 
     return (
         <div className="min-h-screen bg-[#E3D9C6]">
@@ -253,45 +256,52 @@ export default function ProductDetailPage() {
                 {/* Product Details */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
                     {/* Images */}
-                    <div className="space-y-4">
-                        <div className="relative aspect-3/4 overflow-hidden rounded-lg bg-gray-100">
-                            <Image
-                                src={images[selectedImage] || '/placeholder-product.jpg'}
-                                alt={product.name}
-                                fill
-                                className="object-cover"
-                                priority
-                                sizes="(max-width: 1024px) 100vw, 50vw"
-                            />
-                            {isOutOfStock && (
-                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                    <span className="text-white font-semibold text-2xl">Out of Stock</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Thumbnail Gallery */}
+                    <div className="flex flex-col lg:flex-row gap-4">
+                        {/* Thumbnail Gallery - Vertical on large screens */}
                         {images.length > 1 && (
-                            <div className="grid grid-cols-4 gap-4">
+                            <div className="order-2 lg:order-1 grid grid-cols-4 lg:flex lg:flex-col gap-2 lg:gap-0 lg:space-y-2 lg:w-20">
                                 {images.map((img, index) => (
                                     <button
                                         key={index}
-                                        onClick={() => setSelectedImage(index)}
-                                        className={`relative aspect-square rounded-lg overflow-hidden transition-all ${
-                                            selectedImage === index ? 'ring-2 ring-gray-900 scale-105' : 'ring-1 ring-gray-200 hover:ring-gray-400'
-                                        }`}
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setSelectedImage(index);
+                                        }}
+                                        className={`relative aspect-square rounded-md overflow-hidden transition-all ${selectedImage === index ? 'ring-2 ring-gray-900' : 'ring-1 ring-gray-200 hover:ring-gray-400'
+                                            }`}
                                     >
                                         <Image
                                             src={img || '/placeholder-product.jpg'}
                                             alt={`${product.name} ${index + 1}`}
                                             fill
                                             className="object-cover"
-                                            sizes="25vw"
+                                            sizes="80px"
                                         />
                                     </button>
                                 ))}
                             </div>
                         )}
+                        
+                        {/* Main Image */}
+                        <div className="order-1 lg:order-2 flex-1">
+                            <div className="relative aspect-3/4 overflow-hidden rounded-lg bg-gray-100">
+                                <Image
+                                    src={images[selectedImage] || '/placeholder-product.jpg'}
+                                    alt={product.name}
+                                    fill
+                                    className="object-cover"
+                                    priority
+                                    sizes="(max-width: 1024px) 100vw, 50vw"
+                                />
+                                {isOutOfStock && (
+                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                        <span className="text-white font-semibold text-2xl">Out of Stock</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
                     {/* Product Info */}
@@ -300,7 +310,7 @@ export default function ProductDetailPage() {
                             <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
                             <p className="text-2xl font-semibold">{formatPrice(product.price)}</p>
                         </div>
-
+                        <p className='text-red-600'>Incl. all taxes</p>
                         <p className="text-gray-600 leading-relaxed">{product.description}</p>
 
                         {/* Stock Status */}
@@ -344,11 +354,10 @@ export default function ProductDetailPage() {
                                         key={size}
                                         onClick={() => handleSizeChange(size)}
                                         disabled={isOutOfStock}
-                                        className={`px-6 py-3 border rounded-lg font-medium transition-all ${
-                                            selectedSize === size
-                                                ? 'bg-gray-900 text-white border-gray-900'
-                                                : 'bg-[#E3D9C6] text-gray-900 border-gray-300 hover:border-gray-900'
-                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                        className={`px-6 py-3 border rounded-lg font-medium transition-all ${selectedSize === size
+                                            ? 'bg-gray-900 text-white border-gray-900'
+                                            : 'bg-[#E3D9C6] text-gray-900 border-gray-300 hover:border-gray-900'
+                                            } disabled:opacity-50 disabled:cursor-not-allowed`}
                                     >
                                         {size}
                                     </button>
@@ -375,11 +384,10 @@ export default function ProductDetailPage() {
                                             key={index}
                                             onClick={() => handleColorChange(color)}
                                             disabled={isOutOfStock}
-                                            className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-all ${
-                                                isSelected
-                                                    ? 'border-gray-900 ring-2 ring-gray-900'
-                                                    : 'border-gray-300 hover:border-gray-900'
-                                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                            className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-all ${isSelected
+                                                ? 'border-gray-900 ring-2 ring-gray-900'
+                                                : 'border-gray-300 hover:border-gray-900'
+                                                } disabled:opacity-50 disabled:cursor-not-allowed`}
                                         >
                                             <div
                                                 className="w-6 h-6 rounded-full border border-gray-300"
@@ -430,13 +438,12 @@ export default function ProductDetailPage() {
                             <button
                                 onClick={handleAddToCart}
                                 disabled={isOutOfStock || isAdding}
-                                className={`w-full py-4 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 ${
-                                    isOutOfStock
-                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                        : inCart
+                                className={`w-full py-4 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 ${isOutOfStock
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    : inCart
                                         ? 'bg-green-600 hover:bg-green-700 text-white'
                                         : 'bg-gray-900 hover:bg-gray-800 text-white'
-                                } ${isAdding ? 'scale-95' : 'scale-100'}`}
+                                    } ${isAdding ? 'scale-95' : 'scale-100'}`}
                             >
                                 {isOutOfStock ? (
                                     'Out of Stock'
@@ -541,7 +548,6 @@ export default function ProductDetailPage() {
                                                     <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Length</th>
                                                 </>
                                             )}
-                                            <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Notes</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -559,7 +565,6 @@ export default function ProductDetailPage() {
                                                         <td className="border border-gray-300 px-4 py-3">{chart.length_female || '-'}"</td>
                                                     </>
                                                 )}
-                                                <td className="border border-gray-300 px-4 py-3 text-sm text-gray-600">{chart.notes || '-'}</td>
                                             </tr>
                                         ))}
                                     </tbody>

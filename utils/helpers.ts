@@ -186,72 +186,7 @@ export function formatPrice(price: number): string {
 // FILTERING & SORTING
 // ========================================
 
-// Filter products based on filter state
-export function filterProducts(
-	products: Product[],
-	filters: FilterState
-): Product[] {
-	return products.filter((product) => {
-		// Gender filter
-		if (
-			filters.gender.length > 0 &&
-			!filters.gender.includes(product.gender)
-		) {
-			return false;
-		}
 
-		// Category filter
-		if (
-			filters.categories.length > 0 &&
-			!filters.categories.includes(product.category)
-		) {
-			return false;
-		}
-
-		// Price range filter
-		if (
-			product.price < filters.priceRange[0] ||
-			product.price > filters.priceRange[1]
-		) {
-			return false;
-		}
-
-		// Size filter
-		if (filters.sizes.length > 0) {
-			const hasSize = filters.sizes.some((size) =>
-				product.sizes.includes(size)
-			);
-			if (!hasSize) return false;
-		}
-
-		// Color filter
-		if (filters.colors.length > 0) {
-			const hasColor = filters.colors.some((color) =>
-				product.colors
-					.map((c) => c.toLowerCase())
-					.includes(color.toLowerCase())
-			);
-			if (!hasColor) return false;
-		}
-
-		// Stock filter
-		if (filters.inStock && product.stock === 0) {
-			return false;
-		}
-
-		// Search query filter
-		if (filters.searchQuery) {
-			const query = filters.searchQuery.toLowerCase();
-			const matchesName = product.name.toLowerCase().includes(query);
-			const matchesDescription = product.description
-				.toLowerCase()
-				.includes(query);
-			if (!matchesName && !matchesDescription) return false;
-		}
-
-		return true;
-	});
-}
 
 // Sort products
 export function sortProducts(
@@ -278,14 +213,6 @@ export function sortProducts(
 	}
 }
 
-// Get all unique colors from products
-export function getAllColors(products: Product[]): string[] {
-	const colors = new Set<string>();
-	products.forEach((product) => {
-		product.colors.forEach((color) => colors.add(color));
-	});
-	return Array.from(colors).sort();
-}
 
 // Get price range from products
 export function getPriceRange(products: Product[]): [number, number] {
@@ -301,4 +228,129 @@ export function addSlugToProduct(product: Product): Product {
 		...product,
 		slug: generateSlug(product.name),
 	};
+}
+
+// utils/helpers.ts - Add/Update these functions
+
+// Get all unique colors from products (DEDUPLICATED)
+export function getAllColors(products: Product[]): (string | { name: string; hex: string })[] {
+  const colorMap = new Map<string, string | { name: string; hex: string }>();
+  
+  products.forEach(product => {
+    product.colors?.forEach(color => {
+      const colorValue = typeof color === 'string' ? color : (color.name || color.hex);
+      
+      // Use the color value as key to prevent duplicates
+      if (!colorMap.has(colorValue)) {
+        colorMap.set(colorValue, color);
+      }
+    });
+  });
+  
+  return Array.from(colorMap.values());
+}
+
+// Helper to extract category name from slug
+export function extractCategoryFromSlug(slug: string): string {
+  // "mens-jersey" → "Jersey"
+  // "womens-baby-tees" → "Baby Tees"
+  // "womens-oversized-tshirt" → "Oversized T-Shirt"
+  
+  console.log('🔍 EXTRACTING CATEGORY FROM SLUG:', slug);
+  
+  // Remove "mens-" or "womens-" prefix
+  const withoutPrefix = slug.replace(/^(mens|womens)-/, '');
+  console.log('  After removing prefix:', withoutPrefix);
+  
+  // Special cases for known category formats - CHECK YOUR DATABASE!
+  const specialCases: Record<string, string> = {
+    'baby-tees': 'Baby Tees',
+    'oversized-tshirt': 'Oversized T-Shirt',
+    'oversized-t-shirt': 'Oversized T-Shirt',
+    'flared-pants': 'Flared Pants',
+    'sweatshirt': 'Sweatshirt',
+    'sweatshirts': 'Sweatshirts',
+    'sweatpants': 'Sweatpants',
+    'jersey': 'Jersey',
+    'jerseys': 'Jerseys',
+    'shirts': 'Shirts',
+    'shirt': 'Shirt',
+  };
+  
+  if (specialCases[withoutPrefix]) {
+    console.log('  ✅ Found special case mapping:', specialCases[withoutPrefix]);
+    return specialCases[withoutPrefix];
+  }
+  
+  // Default: Convert slug to title case with proper spacing
+  const titleCase = withoutPrefix
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+  
+  console.log('  ⚠️ Using title case conversion:', titleCase);
+  return titleCase;
+}
+
+// Enhanced filter function with better debugging
+export function filterProducts(products: Product[], filters: FilterState): Product[] {
+  return products.filter(product => {
+    // Gender filter
+    if (filters.gender.length > 0 && !filters.gender.includes(product.gender)) {
+      return false;
+    }
+
+    // Category filter
+    if (filters.categories.length > 0) {
+      if (!filters.categories.includes(product.category)) {
+        return false;
+      }
+    }
+
+    // Price filter
+    if (product.price < filters.priceRange[0] || product.price > filters.priceRange[1]) {
+      return false;
+    }
+
+    // Size filter
+    if (filters.sizes.length > 0) {
+      const hasMatchingSize = filters.sizes.some(size => product.sizes.includes(size));
+      if (!hasMatchingSize) {
+        return false;
+      }
+    }
+
+    // Color filter
+    if (filters.colors.length > 0) {
+      const productColors = product.colors.map(color => 
+        typeof color === 'string' ? color : (color.name || color.hex)
+      );
+      const hasMatchingColor = filters.colors.some(filterColor => 
+        productColors.includes(filterColor)
+      );
+      if (!hasMatchingColor) {
+        return false;
+      }
+    }
+
+    // Stock filter
+    if (filters.inStock && product.stock === 0) {
+      return false;
+    }
+
+    // Search query
+    if (filters.searchQuery) {
+      const query = filters.searchQuery.toLowerCase();
+      const matchesSearch = 
+        product.name.toLowerCase().includes(query) ||
+        product.description?.toLowerCase().includes(query) ||
+        product.category.toLowerCase().includes(query);
+      
+      if (!matchesSearch) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 }

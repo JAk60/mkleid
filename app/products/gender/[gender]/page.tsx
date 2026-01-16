@@ -1,11 +1,11 @@
-// app/products/gender/[gender]/page.tsx
+// app/products/gender/[gender]/page.tsx - KEY CHANGES
 
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Product, FilterState, CATEGORIES } from '@/lib/types';
+import { Product, FilterState } from '@/lib/types';
 import { getProducts } from '@/lib/supabase';
 import {
   filterProducts,
@@ -33,6 +33,9 @@ export default function GenderPage() {
   const [loading, setLoading] = useState(true);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [gender, setGender] = useState<'Male' | 'Female' | null>(null);
+  
+  // Get actual categories from products instead of hardcoded list
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
 
   const [filters, setFilters] = useState<FilterState>({
     gender: [],
@@ -48,7 +51,6 @@ export default function GenderPage() {
   useEffect(() => {
     async function fetchProducts() {
       try {
-        // Convert URL gender to DB gender
         const genderValue = urlGenderToDbGender(genderParam);
 
         if (!genderValue) {
@@ -58,20 +60,23 @@ export default function GenderPage() {
 
         setGender(genderValue);
 
-        // Fetch all products
         const products = await getProducts();
         const productsWithSlugs = products.map(addSlugToProduct);
         setAllProducts(productsWithSlugs);
 
-        // Filter products by gender
         const filtered = getProductsByGender(productsWithSlugs, genderValue);
         setGenderProducts(filtered);
+        
+        // Extract unique categories from the actual products
+        const uniqueCategories = [...new Set(filtered.map(p => p.category))];
+        setAvailableCategories(uniqueCategories);
+        
+        console.log('📋 Available categories for', genderValue, ':', uniqueCategories);
 
-        // Set initial price range and pre-select the gender
         const range = filtered.length > 0 ? getPriceRange(filtered) : [0, 100];
         setFilters(prev => ({
           ...prev,
-          priceRange: range,
+          priceRange: range as [number, number],
           gender: [genderValue]
         }));
 
@@ -95,7 +100,7 @@ export default function GenderPage() {
     setFilters({
       gender: gender ? [gender] : [],
       categories: [],
-      priceRange: priceRange,
+      priceRange: priceRange as [number, number],
       sizes: [],
       colors: [],
       inStock: false,
@@ -120,14 +125,12 @@ export default function GenderPage() {
   }
 
   const genderDisplayName = dbGenderToDisplayName(gender);
-  const categories = CATEGORIES[gender];
 
   return (
     <div className="min-h-screen bg-[#E3D9C6]">
       {/* Header */}
       <div className="border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm mb-4">
             <Link href="/products" className="text-gray-600 hover:text-gray-900">
               Products
@@ -138,9 +141,9 @@ export default function GenderPage() {
 
           <h1 className="text-3xl font-bold mb-6">{genderDisplayName} Collection</h1>
 
-          {/* Category Quick Links */}
+          {/* Category Quick Links - Use actual categories from products */}
           <div className="flex flex-wrap gap-2 mb-6">
-            {categories.map((category) => {
+            {availableCategories.map((category) => {
               const categorySlug = generateCategorySlug(`${genderParam}-${category}`);
               return (
                 <Link
@@ -189,15 +192,16 @@ export default function GenderPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Desktop Sidebar */}
+          {/* Desktop Sidebar - Pass available categories */}
           <aside className="hidden lg:block w-64 shrink-0">
             <div className="sticky top-4">
               <FilterSidebar
                 filters={filters}
                 onChange={setFilters}
                 availableColors={availableColors}
-                priceRange={priceRange}
+                priceRange={priceRange as [number, number]}
                 onReset={handleResetFilters}
+                availableCategories={availableCategories}
               />
             </div>
           </aside>
@@ -222,8 +226,9 @@ export default function GenderPage() {
                   filters={filters}
                   onChange={setFilters}
                   availableColors={availableColors}
-                  priceRange={priceRange}
+                  priceRange={priceRange as [number, number]}
                   onReset={handleResetFilters}
+                  availableCategories={availableCategories}
                 />
               </div>
             </div>

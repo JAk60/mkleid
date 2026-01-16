@@ -113,8 +113,8 @@ function Carousel({ products, gender, videoSrc }: CarouselProps) {
         </Link>
       </div>
 
-      
-  
+
+
     </div>
   );
 }
@@ -130,7 +130,7 @@ export default function HeroCarousel() {
       <Carousel
         products={[{ id: 1, name: "", price: "" }]}
         gender="Women's"
-        videoSrc="/videos/L1.mp4"
+        videoSrc="/videos/L2.mp4"
       />
     </div>
   );
