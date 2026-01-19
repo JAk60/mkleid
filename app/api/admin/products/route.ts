@@ -1,4 +1,4 @@
-// app/api/admin/products/route.ts - FIXED VERSION
+// app/api/admin/products/route.ts - UPDATED WITH SHIPROCKET FIELDS
 
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
@@ -6,8 +6,6 @@ import { supabase } from '@/lib/supabase';
 // Helper function to delete image from Cloudinary
 async function deleteFromCloudinary(imageUrl: string) {
   try {
-    // Extract public_id from Cloudinary URL
-    // Example: https://res.cloudinary.com/demo/image/upload/v1234567890/products/abc123.jpg
     const regex = /\/products\/([^/.]+)/;
     const match = imageUrl.match(regex);
     
@@ -15,7 +13,6 @@ async function deleteFromCloudinary(imageUrl: string) {
     
     const publicId = `products/${match[1]}`;
     
-    // Call Cloudinary deletion API (you'll need to set up a server-side endpoint)
     await fetch('/api/cloudinary/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -127,12 +124,46 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validate ShipRocket fields
+    if (!body.weight || body.weight < 0.1) {
+      return NextResponse.json(
+        { error: 'Weight must be at least 0.1 kg' },
+        { status: 400 }
+      );
+    }
+
+    if (!body.length || body.length < 1) {
+      return NextResponse.json(
+        { error: 'Length must be at least 1 cm' },
+        { status: 400 }
+      );
+    }
+
+    if (!body.breadth || body.breadth < 1) {
+      return NextResponse.json(
+        { error: 'Breadth must be at least 1 cm' },
+        { status: 400 }
+      );
+    }
+
+    if (!body.height || body.height < 1) {
+      return NextResponse.json(
+        { error: 'Height must be at least 1 cm' },
+        { status: 400 }
+      );
+    }
+
     // Use the primary image or first image as main image_url
     const primaryImage = body.images.find((img: any) => img.is_primary) || body.images[0];
 
     console.log('📸 Inserting product with images:', body.images.length);
+    console.log('📦 ShipRocket details:', {
+      weight: body.weight,
+      dimensions: `${body.length}x${body.breadth}x${body.height}`,
+      sku: body.sku || 'auto-generated'
+    });
 
-    // Insert product
+    // Insert product with ShipRocket fields
     const { data: product, error: productError } = await supabase
       .from('products')
       .insert({
@@ -146,6 +177,12 @@ export async function POST(request: Request) {
         stock: body.stock,
         gender: body.gender,
         has_size_chart: body.has_size_chart || false,
+        // ShipRocket fields
+        weight: body.weight || 0.5,
+        length: body.length || 10,
+        breadth: body.breadth || 10,
+        height: body.height || 5,
+        sku: body.sku || null, // Will use product ID if null
       })
       .select()
       .single();
@@ -156,6 +193,17 @@ export async function POST(request: Request) {
     }
 
     console.log('✅ Product created with ID:', product.id);
+
+    // Auto-generate SKU if not provided
+    if (!body.sku) {
+      const autoSku = `SKU-${product.id}`;
+      await supabase
+        .from('products')
+        .update({ sku: autoSku })
+        .eq('id', product.id);
+      
+      console.log('✅ Auto-generated SKU:', autoSku);
+    }
 
     // Insert product images
     if (body.images && body.images.length > 0) {
@@ -174,7 +222,6 @@ export async function POST(request: Request) {
 
       if (imagesError) {
         console.error('❌ Insert images error:', imagesError);
-        // Don't throw - product is already created
       } else {
         console.log(`✅ Inserted ${imagesToInsert.length} images`);
       }
@@ -240,6 +287,35 @@ export async function PUT(request: Request) {
     console.log('📝 Updating product ID:', id);
     console.log('📸 New images count:', images?.length || 0);
 
+    // Validate ShipRocket fields if provided
+    if (updates.weight !== undefined && updates.weight < 0.1) {
+      return NextResponse.json(
+        { error: 'Weight must be at least 0.1 kg' },
+        { status: 400 }
+      );
+    }
+
+    if (updates.length !== undefined && updates.length < 1) {
+      return NextResponse.json(
+        { error: 'Length must be at least 1 cm' },
+        { status: 400 }
+      );
+    }
+
+    if (updates.breadth !== undefined && updates.breadth < 1) {
+      return NextResponse.json(
+        { error: 'Breadth must be at least 1 cm' },
+        { status: 400 }
+      );
+    }
+
+    if (updates.height !== undefined && updates.height < 1) {
+      return NextResponse.json(
+        { error: 'Height must be at least 1 cm' },
+        { status: 400 }
+      );
+    }
+
     // Update primary image_url if images are provided
     if (images && images.length > 0) {
       const primaryImage = images.find((img: any) => img.is_primary) || images[0];
@@ -248,6 +324,14 @@ export async function PUT(request: Request) {
 
     // Update has_size_chart flag
     updates.has_size_chart = has_size_chart || false;
+
+    console.log('📦 Updating ShipRocket fields:', {
+      weight: updates.weight,
+      length: updates.length,
+      breadth: updates.breadth,
+      height: updates.height,
+      sku: updates.sku
+    });
 
     // Update product
     const { data: product, error: productError } = await supabase

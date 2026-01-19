@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, X, Save, Search, Upload, Image as ImageIcon, Ruler, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Edit, Trash2, X, Save, Search, Upload, Image as ImageIcon, Ruler, ChevronUp, ChevronDown, Package } from "lucide-react";
 import { Category } from "@/lib/categories-db";
 
 interface ColorOption {
@@ -37,8 +37,12 @@ interface Product {
   images?: ProductImage[];
   has_size_chart?: boolean;
   size_chart?: SizeChart[];
+  weight?: number;
+  length?: number;
+  breadth?: number;
+  height?: number;
+  sku?: string;
 }
-
 
 const SIZES = ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 
@@ -78,27 +82,11 @@ export default function ProductsManagement() {
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
   const [uploadingImageIndex, setUploadingImageIndex] = useState<number | null>(null);
-
   const [showSizeChart, setShowSizeChart] = useState(false);
   const [sizeChart, setSizeChart] = useState<SizeChart[]>([]);
-
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  const fetchCategories = async () => {
-    try {
-      setLoadingCategories(true);
-      const response = await fetch('/api/categories');
-      const data = await response.json();
 
-      if (data.success) {
-        setCategories(data.data);
-      }
-    } catch (error) {
-      console.error('Failed to load categories:', error);
-    } finally {
-      setLoadingCategories(false);
-    }
-  };
   const [formData, setFormData] = useState<Product>({
     name: "",
     description: "",
@@ -110,7 +98,28 @@ export default function ProductsManagement() {
     stock: 0,
     gender: "Male",
     has_size_chart: false,
+    weight: 0.5,
+    length: 10,
+    breadth: 10,
+    height: 5,
+    sku: "",
   });
+
+  const fetchCategories = async () => {
+    try {
+      setLoadingCategories(true);
+      const response = await fetch('/api/categories');
+      const data = await response.json();
+      if (data.success) {
+        setCategories(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to load categories:', error);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
   const getCategoriesByGender = (gender: 'Male' | 'Female') => {
     return categories.filter(cat => cat.gender === gender);
   };
@@ -122,7 +131,6 @@ export default function ProductsManagement() {
       setCloudinaryLoaded(true);
       return;
     }
-
     const script = document.createElement("script");
     script.src = "https://upload-widget.cloudinary.com/global/all.js";
     script.async = true;
@@ -148,30 +156,30 @@ export default function ProductsManagement() {
   const handleOpenModal = (product?: Product) => {
     if (product) {
       setEditingProduct(product);
-      setFormData(product);
+      setFormData({
+        ...product,
+        weight: product.weight || 0.5,
+        length: product.length || 10,
+        breadth: product.breadth || 10,
+        height: product.height || 5,
+        sku: product.sku || "",
+      });
       
-      // FIX: Properly load existing images when editing
       if (product.images && product.images.length > 0) {
-        // Product has multiple images in product_images table
-        console.log('📸 Loading product images:', product.images);
         setProductImages(product.images);
       } else if (product.image_url) {
-        // Fallback: Product only has main image_url
-        console.log('📸 Loading single image from image_url');
         setProductImages([{
           image_url: product.image_url,
           display_order: 0,
           is_primary: true
         }]);
       } else {
-        // No images at all
         setProductImages([]);
       }
       
       setSizeChart(product.size_chart || []);
       setShowSizeChart(product.has_size_chart || false);
     } else {
-      // Creating new product
       setEditingProduct(null);
       setFormData({
         name: "",
@@ -184,12 +192,16 @@ export default function ProductsManagement() {
         stock: 0,
         gender: "Male",
         has_size_chart: false,
+        weight: 0.5,
+        length: 10,
+        breadth: 10,
+        height: 5,
+        sku: "",
       });
       setProductImages([]);
       setSizeChart([]);
       setShowSizeChart(false);
     }
-
     setColorNameInput("");
     setColorHexInput("");
     setShowPresets(false);
@@ -197,10 +209,11 @@ export default function ProductsManagement() {
   };
 
   useEffect(() => {
-   fetchProducts();
-   fetchCategories(); // ADD THIS LINE
-   loadCloudinaryScript();
- }, []);
+    fetchProducts();
+    fetchCategories();
+    loadCloudinaryScript();
+  }, []);
+
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingProduct(null);
@@ -214,18 +227,14 @@ export default function ProductsManagement() {
       alert("Cloudinary is still loading. Please try again in a moment.");
       return;
     }
-
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-
     if (!cloudName || !uploadPreset) {
       alert("Cloudinary is not configured.");
       return;
     }
-
     setUploading(true);
     if (imageIndex !== undefined) setUploadingImageIndex(imageIndex);
-
     const widget = (window as any).cloudinary.createUploadWidget(
       {
         cloudName,
@@ -248,10 +257,8 @@ export default function ProductsManagement() {
           setUploadingImageIndex(null);
           return;
         }
-
         if (result?.event === "success") {
           const imageUrl = result.info.secure_url;
-
           if (imageIndex !== undefined) {
             const newImages = [...productImages];
             newImages[imageIndex] = { ...newImages[imageIndex], image_url: imageUrl };
@@ -264,38 +271,30 @@ export default function ProductsManagement() {
             };
             setProductImages([...productImages, newImage]);
           }
-
           if (productImages.length === 0 || imageIndex === 0) {
             setFormData(prev => ({ ...prev, image_url: imageUrl }));
           }
-
           setUploading(false);
           setUploadingImageIndex(null);
           widget.close();
         }
-
         if (result?.event === "close" || result?.event === "abort") {
           setUploading(false);
           setUploadingImageIndex(null);
         }
       }
     );
-
     widget.open();
   };
 
   const moveImage = (index: number, direction: "up" | "down") => {
     const newImages = [...productImages];
     const targetIndex = direction === "up" ? index - 1 : index + 1;
-
     if (targetIndex < 0 || targetIndex >= newImages.length) return;
-
     [newImages[index], newImages[targetIndex]] = [newImages[targetIndex], newImages[index]];
     newImages[index].display_order = index;
     newImages[targetIndex].display_order = targetIndex;
-
     setProductImages(newImages);
-
     if (newImages[0].is_primary) {
       setFormData(prev => ({ ...prev, image_url: newImages[0].image_url }));
     }
@@ -308,7 +307,6 @@ export default function ProductsManagement() {
       if (i === 0) img.is_primary = true;
     });
     setProductImages(newImages);
-
     if (newImages.length > 0) {
       setFormData(prev => ({ ...prev, image_url: newImages[0].image_url }));
     }
@@ -357,30 +355,24 @@ export default function ProductsManagement() {
       alert("Please enter both color name and hex code");
       return;
     }
-
     let hex = colorHexInput.trim();
     if (!hex.startsWith("#")) hex = "#" + hex;
-
     const regex = /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/;
     if (!regex.test(hex)) {
       alert("Invalid hex color");
       return;
     }
-
     if (hex.length === 4) {
       hex = "#" + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
     }
-
     if (formData.colors.some(c => c.hex === hex.toUpperCase())) {
       alert("This color is already added");
       return;
     }
-
     setFormData(prev => ({
       ...prev,
       colors: [...prev.colors, { name: colorNameInput.trim(), hex: hex.toUpperCase() }],
     }));
-
     setColorNameInput("");
     setColorHexInput("");
   };
@@ -396,9 +388,7 @@ export default function ProductsManagement() {
     const newSizes = formData.sizes.includes(size)
       ? formData.sizes.filter(s => s !== size)
       : [...formData.sizes, size];
-
     setFormData(prev => ({ ...prev, sizes: newSizes }));
-
     if (showSizeChart) {
       if (newSizes.includes(size) && !sizeChart.find(s => s.size === size)) {
         setSizeChart([...sizeChart, { size, notes: "" }]);
@@ -433,7 +423,22 @@ export default function ProductsManagement() {
       alert("Please upload at least one product image");
       return;
     }
-
+    if (!formData.weight || formData.weight < 0.1) {
+      alert("Weight must be at least 0.1 kg");
+      return;
+    }
+    if (!formData.length || formData.length < 1) {
+      alert("Length must be at least 1 cm");
+      return;
+    }
+    if (!formData.breadth || formData.breadth < 1) {
+      alert("Breadth must be at least 1 cm");
+      return;
+    }
+    if (!formData.height || formData.height < 1) {
+      alert("Height must be at least 1 cm");
+      return;
+    }
     if (showSizeChart && sizeChart.length > 0) {
       const isValid = sizeChart.every(s => {
         if (formData.gender === "Male") {
@@ -442,33 +447,27 @@ export default function ProductsManagement() {
           return s.bust && s.length_female;
         }
       });
-
       if (!isValid) {
         alert(`Please fill all size chart measurements for ${formData.gender === "Male" ? "Chest and Length" : "Bust and Length"}`);
         return;
       }
     }
-
     try {
       setSubmitting(true);
-
       const payload = {
         ...formData,
         images: productImages,
         has_size_chart: showSizeChart,
         size_chart: showSizeChart ? sizeChart : [],
       };
-
       const method = editingProduct ? "PUT" : "POST";
       const res = await fetch("/api/admin/products", {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingProduct ? { id: editingProduct.id, ...payload } : payload),
       });
-
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error);
-
       alert(editingProduct ? "Product updated successfully!" : "Product created successfully!");
       await fetchProducts();
       handleCloseModal();
@@ -481,12 +480,10 @@ export default function ProductsManagement() {
 
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
-
     try {
       const res = await fetch(`/api/admin/products?id=${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
-
       alert("Product deleted successfully!");
       fetchProducts();
     } catch (err: any) {
@@ -598,10 +595,15 @@ export default function ProductsManagement() {
                 </div>
                 <div className="mt-3 flex items-center gap-4 flex-wrap">
                   <span className="font-bold text-blue-600 text-lg">₹{product.price.toLocaleString()}</span>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${product.gender === 'Male' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'
-                    }`}>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${product.gender === 'Male' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'}`}>
                     {product.gender}
                   </span>
+                  {product.weight && (
+                    <span className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-semibold flex items-center gap-1">
+                      <Package size={14} />
+                      {product.weight}kg • {product.length}×{product.breadth}×{product.height}cm
+                    </span>
+                  )}
                   {product.has_size_chart && (
                     <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold flex items-center gap-1">
                       <Ruler size={14} />
@@ -634,8 +636,7 @@ export default function ProductsManagement() {
             <button
               key={i}
               onClick={() => setCurrentPage(i + 1)}
-              className={`px-4 py-2 border rounded transition ${currentPage === i + 1 ? "bg-blue-600 text-white" : "hover:bg-gray-100"
-                }`}
+              className={`px-4 py-2 border rounded transition ${currentPage === i + 1 ? "bg-blue-600 text-white" : "hover:bg-gray-100"}`}
             >
               {i + 1}
             </button>
@@ -733,6 +734,86 @@ export default function ProductsManagement() {
                     className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+              </div>
+
+              <div className="border-2 border-orange-200 rounded-lg p-4 bg-orange-50">
+                <div className="flex items-center gap-2 mb-4">
+                  <Package className="text-orange-600" size={24} />
+                  <h3 className="text-lg font-bold text-orange-900">Shipping Details (For ShipRocket)</h3>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-medium mb-1 text-sm">Weight (kg) *</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      value={formData.weight}
+                      onChange={(e) => setFormData({ ...formData, weight: parseFloat(e.target.value) || 0.5 })}
+                      className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-orange-500"
+                      placeholder="0.5"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Minimum: 0.1 kg</p>
+                  </div>
+
+                  <div>
+                    <label className="block font-medium mb-1 text-sm">SKU (Optional)</label>
+                    <input
+                      type="text"
+                      value={formData.sku}
+                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                      className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-orange-500"
+                      placeholder="Auto-generated if empty"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Leave empty for auto SKU</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <label className="block font-medium mb-1 text-sm">Length (cm) *</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      value={formData.length}
+                      onChange={(e) => setFormData({ ...formData, length: parseFloat(e.target.value) || 10 })}
+                      className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-orange-500"
+                      placeholder="10"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-medium mb-1 text-sm">Breadth (cm) *</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      value={formData.breadth}
+                      onChange={(e) => setFormData({ ...formData, breadth: parseFloat(e.target.value) || 10 })}
+                      className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-orange-500"
+                      placeholder="10"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-medium mb-1 text-sm">Height (cm) *</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      value={formData.height}
+                      onChange={(e) => setFormData({ ...formData, height: parseFloat(e.target.value) || 5 })}
+                      className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-orange-500"
+                      placeholder="5"
+                    />
+                  </div>
+                </div>
+
+                <p className="text-xs text-orange-700 mt-3">
+                  📦 These details are required for ShipRocket shipping integration
+                </p>
               </div>
 
               <div>
