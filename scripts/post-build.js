@@ -1,51 +1,54 @@
 const fs = require('fs');
 const path = require('path');
 
-// Move worker.js to _worker.js
-if (fs.existsSync('.open-next/worker.js')) {
+console.log('📦 Starting post-build processing...');
+
+// Check if _worker.js exists, if not try worker.js
+const workerSource = fs.existsSync('.open-next/_worker.js') 
+  ? '.open-next/_worker.js' 
+  : '.open-next/worker.js';
+
+if (fs.existsSync(workerSource)) {
+  console.log(`✓ Found worker at ${workerSource}`);
+  
+  // Ensure it's named _worker.js
+  if (workerSource === '.open-next/worker.js') {
     fs.renameSync('.open-next/worker.js', '.open-next/_worker.js');
+    console.log('✓ Renamed worker.js to _worker.js');
+  }
+} else {
+  console.error('✗ No worker file found!');
 }
 
-// Copy assets to root
-const assetsDir = '.open-next/assets';
-if (fs.existsSync(assetsDir)) {
-    const files = fs.readdirSync(assetsDir);
-    files.forEach(file => {
-        const srcPath = path.join(assetsDir, file);
-        const destPath = path.join('.open-next', file);
-
-        if (fs.statSync(srcPath).isDirectory()) {
-            // Copy directory recursively
-            fs.cpSync(srcPath, destPath, { recursive: true });
-        } else {
-            // Copy file
-            fs.copyFileSync(srcPath, destPath);
-        }
-    });
-}
-
-// Create _routes.json
+// Create _routes.json for proper routing
 const routesConfig = {
-    version: 1,
-    include: ['/*'],
-    exclude: [
-        '/_next/static/*',
-        '/favicon.ico',
-        '/robots.txt',
-        '/sitemap.xml',
-        '/*.png',
-        '/*.jpg',
-        '/*.jpeg',
-        '/*.gif',
-        '/*.svg',
-        '/*.ico',
-        '/*.webp'
-    ]
+  version: 1,
+  include: ['/*'],
+  exclude: [
+    '/favicon.ico',
+    '/robots.txt',
+    '/*.png',
+    '/*.jpg',
+    '/*.jpeg',
+    '/*.gif',
+    '/*.svg',
+    '/*.ico',
+    '/*.webp'
+  ]
 };
 
 fs.writeFileSync(
-    '.open-next/_routes.json',
-    JSON.stringify(routesConfig, null, 2)
+  '.open-next/_routes.json',
+  JSON.stringify(routesConfig, null, 2)
 );
+console.log('✓ Created _routes.json');
 
-console.log('✅ Post-build processing complete!');
+// List the contents of .open-next for debugging
+console.log('\n📁 Contents of .open-next:');
+const files = fs.readdirSync('.open-next');
+files.forEach(file => {
+  const stats = fs.statSync(path.join('.open-next', file));
+  console.log(`  ${stats.isDirectory() ? '📂' : '📄'} ${file}`);
+});
+
+console.log('\n✅ Post-build processing complete!');
