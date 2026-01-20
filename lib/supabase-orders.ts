@@ -158,7 +158,7 @@ function checkOrderCreationLimit(userId: string): { allowed: boolean; message?: 
   return { allowed: true };
 }
 
-// ✅ UPDATED: Create order with automatic inventory update
+// ✅ UPDATED: Create order with automatic inventory update and better error handling
 export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'created_at' | 'updated_at'>) {
   // Check rate limit
   const rateLimitCheck = checkOrderCreationLimit(order.user_id);
@@ -205,37 +205,90 @@ export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'cr
     throw new Error(`Stock validation failed: ${stockValidation.errors.join(', ')}`);
   }
 
-  // ✅ STEP 2: Create order in database
+  // ✅ STEP 2: Generate order number and create order in database
   console.log('📝 Creating order in database...');
+  
+  // Generate unique order number (format: ORD-TIMESTAMP-RANDOM)
+  const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+  
+  const orderWithNumber = {
+    ...order,
+    order_number: orderNumber
+  };
+  
+  console.log('Order data:', {
+    order_number: orderNumber,
+    user_id: order.user_id,
+    items_count: order.items.length,
+    total: order.total,
+    payment_method: order.payment_method,
+    has_shipping_address: !!order.shipping_address
+  });
+
   const { data, error } = await supabase
     .from('orders')
-    .insert(order)
+    .insert(orderWithNumber)
     .select()
     .single();
 
   if (error) {
-    console.error('Order creation error:', error);
-    throw new Error(error.message || 'Failed to create order');
+    console.error('❌ Order creation error details:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      fullError: JSON.stringify(error, null, 2)
+    });
+    
+    // Provide a more helpful error message
+    let errorMessage = 'Failed to create order';
+    
+    if (error.message) {
+      errorMessage = error.message;
+    } else if (error.details) {
+      errorMessage = `Database error: ${error.details}`;
+    } else if (error.code) {
+      errorMessage = `Database error code: ${error.code}`;
+    } else {
+      errorMessage = 'Failed to create order. Please check that all required fields are provided.';
+    }
+    
+    throw new Error(errorMessage);
+  }
+
+  if (!data) {
+    throw new Error('Order created but no data returned from database');
   }
 
   // ✅ STEP 3: Update product stock
   console.log('📉 Updating product inventory...');
-  const stockUpdate = await updateProductStock(
-    order.items.map(item => ({
-      product_id: item.product_id,
-      quantity: item.quantity,
-      size: item.size,
-      color: item.color
-    }))
-  );
+  try {
+    const stockUpdate = await updateProductStock(
+      order.items.map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        size: item.size,
+        color: item.color
+      }))
+    );
 
-  if (!stockUpdate.success) {
-    console.error('❌ Stock update failed:', stockUpdate.errors);
+    if (!stockUpdate.success) {
+      console.error('❌ Stock update failed:', stockUpdate.errors);
+      
+      // Rollback: Delete the order if stock update failed
+      console.log('🔄 Rolling back order creation...');
+      await supabase.from('orders').delete().eq('id', data.id);
+      
+      throw new Error(`Stock update failed: ${stockUpdate.errors.join(', ')}. Order has been cancelled.`);
+    }
+  } catch (stockError) {
+    console.error('❌ Stock update exception:', stockError);
     
-    // Rollback: Delete the order if stock update failed
+    // Rollback: Delete the order
+    console.log('🔄 Rolling back order creation due to exception...');
     await supabase.from('orders').delete().eq('id', data.id);
     
-    throw new Error(`Order created but stock update failed: ${stockUpdate.errors.join(', ')}. Order has been cancelled.`);
+    throw new Error(`Failed to update inventory: ${stockError instanceof Error ? stockError.message : 'Unknown error'}. Order has been cancelled.`);
   }
 
   console.log('✅ Order created successfully with inventory updated:', data.id);
