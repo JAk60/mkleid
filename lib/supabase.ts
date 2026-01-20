@@ -5,7 +5,7 @@ import { Product } from "./types";
 
 let supabaseInstance: SupabaseClient | null = null;
 
-function getSupabase(): SupabaseClient {
+export function getSupabase(): SupabaseClient {
   if (!supabaseInstance) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -19,17 +19,21 @@ function getSupabase(): SupabaseClient {
   return supabaseInstance;
 }
 
-// Export using Proxy for lazy initialization
-export const supabase = new Proxy({} as SupabaseClient, {
+// Backward compatible export - this getter ensures lazy initialization
+export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
   get(target, prop) {
-    return getSupabase()[prop as keyof SupabaseClient];
+    const instance = getSupabase();
+    const value = instance[prop as keyof SupabaseClient];
+    return typeof value === 'function' ? value.bind(instance) : value;
   }
 });
 
 // Helper function to fetch images and size chart for a product
 async function enrichProductWithDetails(product: any): Promise<Product> {
+  const client = getSupabase();
+  
   // Fetch product images
-  const { data: images } = await supabase
+  const { data: images } = await client
     .from('product_images')
     .select('*')
     .eq('product_id', product.id)
@@ -38,7 +42,7 @@ async function enrichProductWithDetails(product: any): Promise<Product> {
   // Fetch size chart if available
   let sizeChart = [];
   if (product.has_size_chart) {
-    const { data: chart } = await supabase
+    const { data: chart } = await client
       .from('size_charts')
       .select('*')
       .eq('product_id', product.id);
@@ -55,7 +59,9 @@ async function enrichProductWithDetails(product: any): Promise<Product> {
 
 // Fetch all products with images and size charts
 export async function getProducts() {
-  const { data, error } = await supabase
+  const client = getSupabase();
+  
+  const { data, error } = await client
     .from("products")
     .select("*")
     .order("created_at", { ascending: false });
@@ -72,7 +78,9 @@ export async function getProducts() {
 
 // Fetch single product by slug with images and size chart
 export async function getProductBySlug(slug: string) {
-  const { data, error } = await supabase
+  const client = getSupabase();
+  
+  const { data, error } = await client
     .from("products")
     .select("*")
     .ilike("name", slug.replace(/-/g, " "))
@@ -85,6 +93,8 @@ export async function getProductBySlug(slug: string) {
 
 // Fetch products by category with images and size charts
 export async function getProductsByCategory(categorySlug: string) {
+  const client = getSupabase();
+  
   const parts = categorySlug.split("-");
   const gender = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
   const category = parts
@@ -94,7 +104,7 @@ export async function getProductsByCategory(categorySlug: string) {
 
   const categoryName = `${gender}-${category}`;
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("products")
     .select("*")
     .eq("category", categoryName)
@@ -111,7 +121,9 @@ export async function getProductsByCategory(categorySlug: string) {
 
 // Fetch products by gender with images and size charts
 export async function getProductsByGender(gender: "Male" | "Female") {
-  const { data, error } = await supabase
+  const client = getSupabase();
+  
+  const { data, error } = await client
     .from("products")
     .select("*")
     .eq("gender", gender)
@@ -128,7 +140,9 @@ export async function getProductsByGender(gender: "Male" | "Female") {
 
 // Search products with images and size charts
 export async function searchProducts(query: string) {
-  const { data, error } = await supabase
+  const client = getSupabase();
+  
+  const { data, error } = await client
     .from("products")
     .select("*")
     .or(`name.ilike.%${query}%,description.ilike.%${query}%`)

@@ -5,7 +5,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 let supabaseAdminInstance: SupabaseClient | null = null;
 
-function getSupabaseAdmin(): SupabaseClient {
+export function getSupabaseAdmin(): SupabaseClient {
   if (!supabaseAdminInstance) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -26,9 +26,11 @@ function getSupabaseAdmin(): SupabaseClient {
   return supabaseAdminInstance;
 }
 
-// Export using Proxy for lazy initialization
-export const supabaseAdmin = new Proxy({} as SupabaseClient, {
+// Backward compatible export - this getter ensures lazy initialization
+export const supabaseAdmin: SupabaseClient = new Proxy({} as SupabaseClient, {
   get(target, prop) {
-    return getSupabaseAdmin()[prop as keyof SupabaseClient];
+    const instance = getSupabaseAdmin();
+    const value = instance[prop as keyof SupabaseClient];
+    return typeof value === 'function' ? value.bind(instance) : value;
   }
 });
