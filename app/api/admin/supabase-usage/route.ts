@@ -86,7 +86,7 @@ export async function GET() {
       },
       plan: 'free',
       lastUpdated: new Date().toISOString(),
-      recommendations: []
+      recommendations: [] as string[]
     };
 
     // Add recommendations based on usage
