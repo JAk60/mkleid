@@ -103,10 +103,12 @@ export async function GET() {
   } catch (error) {
     console.error('❌ Cloudinary Usage API Error:', error);
     
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch Cloudinary usage';
+    
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Failed to fetch Cloudinary usage',
+        error: errorMessage,
         data: {
           images: { used: 0, limit: 25000 },
           storage: { used: 0, limit: 25 },
