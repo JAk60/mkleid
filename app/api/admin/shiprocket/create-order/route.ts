@@ -1,15 +1,23 @@
-// Admin API - Manually create ShipRocket order
-
+// app/api/admin/shiprocket/create-order/route.ts - FIXED FOR BUILD
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { createShipRocketOrder, generateAWBForOrder, schedulePickupForOrder } from '@/lib/shiprocket/orderService';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// ✅ FIX: Lazy initialization
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey);
+}
 
 export async function POST(req: NextRequest) {
+  const supabase = getSupabaseClient(); // ✅ Create client here
+
   try {
     const { orderId, action = 'create' } = await req.json();
 

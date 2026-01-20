@@ -1,15 +1,21 @@
-// Razorpay Webhook Handler - Payment confirmation + ShipRocket integration
-
+// app/api/webhooks/razorpay/route.ts - FIXED FOR BUILD
 import { createClient } from '@supabase/supabase-js';
 import { headers } from 'next/headers';
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createShipRocketOrder } from '@/lib/shiprocket/orderService';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// ✅ FIX: Lazy initialization - don't create client at module level
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey);
+}
 
 /**
  * Verify Razorpay webhook signature
@@ -34,6 +40,7 @@ async function handlePaymentCaptured(payment: any) {
   console.log('Processing payment.captured event:', payment.id);
 
   const { order_id, id: payment_id } = payment;
+  const supabase = getSupabaseClient(); // ✅ Create client here
 
   try {
     // Find order by razorpay_order_id
@@ -72,10 +79,8 @@ async function handlePaymentCaptured(payment: any) {
       const shipRocketResult = await createShipRocketOrder(order.id);
       console.log('ShipRocket order created:', shipRocketResult);
     } catch (shipRocketError: any) {
-      // Log error but don't fail the webhook
       console.error('ShipRocket order creation failed:', shipRocketError.message);
       
-      // Store error for admin to handle manually
       await supabase.from('shiprocket_logs').insert({
         order_id: order.id,
         action: 'auto_create_order',
@@ -98,6 +103,7 @@ async function handlePaymentFailed(payment: any) {
   console.log('Processing payment.failed event:', payment.id);
 
   const { order_id } = payment;
+  const supabase = getSupabaseClient(); // ✅ Create client here
 
   try {
     const { error } = await supabase

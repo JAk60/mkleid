@@ -1,12 +1,18 @@
-// ShipRocket Webhook Handler - Tracking status updates
-
+// app/api/webhooks/shiprocket/route.ts - FIXED FOR BUILD
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// ✅ FIX: Lazy initialization
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey);
+}
 
 /**
  * Map ShipRocket status to our order status
@@ -32,6 +38,8 @@ function mapShipRocketStatus(shipRocketStatus: string): string {
  * Handle shipment status updates
  */
 export async function POST(req: NextRequest) {
+  const supabase = getSupabaseClient(); // ✅ Create client here
+
   try {
     const payload = await req.json();
     console.log('ShipRocket webhook received:', payload);

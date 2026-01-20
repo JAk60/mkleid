@@ -1,5 +1,4 @@
-// ShipRocket Order Service - Transform and create orders
-
+// lib/shiprocket/orderService.ts - FIXED FOR BUILD
 import { createClient } from '@supabase/supabase-js';
 import { shipRocketClient } from './client';
 import {
@@ -8,10 +7,17 @@ import {
   SupabaseOrder,
 } from './types';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// ✅ FIX: Lazy initialization
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey);
+}
 
 /**
  * Calculate package dimensions from order items
@@ -22,13 +28,14 @@ async function calculatePackageDimensions(items: any[]): Promise<{
   breadth: number;
   height: number;
 }> {
+  const supabase = getSupabaseClient(); // ✅ Create client here
+  
   let totalWeight = 0;
   let maxLength = 0;
   let maxBreadth = 0;
   let totalHeight = 0;
 
   for (const item of items) {
-    // Get product details from database
     const { data: product } = await supabase
       .from('products')
       .select('weight, length, breadth, height')
@@ -42,7 +49,6 @@ async function calculatePackageDimensions(items: any[]): Promise<{
       maxBreadth = Math.max(maxBreadth, product.breadth || 10);
       totalHeight += (product.height || 5) * qty;
     } else {
-      // Default values if product not found
       totalWeight += 0.5;
       maxLength = Math.max(maxLength, 10);
       maxBreadth = Math.max(maxBreadth, 10);
@@ -51,8 +57,8 @@ async function calculatePackageDimensions(items: any[]): Promise<{
   }
 
   return {
-    weight: Math.max(totalWeight, 0.5), // Minimum 0.5kg
-    length: Math.max(maxLength, 10), // Minimum 10cm
+    weight: Math.max(totalWeight, 0.5),
+    length: Math.max(maxLength, 10),
     breadth: Math.max(maxBreadth, 10),
     height: Math.max(totalHeight, 5),
   };
@@ -62,10 +68,10 @@ async function calculatePackageDimensions(items: any[]): Promise<{
  * Transform order items to ShipRocket format
  */
 async function transformOrderItems(items: any[]): Promise<ShipRocketOrderItem[]> {
+  const supabase = getSupabaseClient(); // ✅ Create client here
   const shipRocketItems: ShipRocketOrderItem[] = [];
 
   for (const item of items) {
-    // Get product SKU from database
     const { data: product } = await supabase
       .from('products')
       .select('sku, name')
@@ -90,10 +96,11 @@ async function transformOrderItems(items: any[]): Promise<ShipRocketOrderItem[]>
  * Create ShipRocket order from Supabase order
  */
 export async function createShipRocketOrder(orderId: string) {
+  const supabase = getSupabaseClient(); // ✅ Create client here
+
   try {
     console.log(`Creating ShipRocket order for: ${orderId}`);
 
-    // Get order details from Supabase
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select('*')
@@ -104,7 +111,6 @@ export async function createShipRocketOrder(orderId: string) {
       throw new Error(`Order not found: ${orderId}`);
     }
 
-    // Check if already synced
     if (order.shiprocket_order_id) {
       console.log(`Order already synced to ShipRocket: ${order.shiprocket_order_id}`);
       return {
@@ -117,17 +123,12 @@ export async function createShipRocketOrder(orderId: string) {
     const shippingAddress = order.shipping_address;
     const items = order.items;
 
-    // Calculate package dimensions
     const dimensions = await calculatePackageDimensions(items);
-
-    // Transform items
     const orderItems = await transformOrderItems(items);
 
-    // Get user email
     const { data: user } = await supabase.auth.admin.getUserById(order.user_id);
     const userEmail = user?.user?.email || 'customer@example.com';
 
-    // Prepare ShipRocket order payload
     const payload: ShipRocketCreateOrderPayload = {
       order_id: order.order_number,
       order_date: new Date(order.created_at).toISOString().split('T')[0],
@@ -158,7 +159,6 @@ export async function createShipRocketOrder(orderId: string) {
       weight: dimensions.weight,
     };
 
-    // Log request
     await supabase.from('shiprocket_logs').insert({
       order_id: orderId,
       action: 'create_order',
@@ -166,10 +166,8 @@ export async function createShipRocketOrder(orderId: string) {
       status: 'pending',
     });
 
-    // Create order in ShipRocket
     const shipRocketResponse = await shipRocketClient.createOrder(payload);
 
-    // Update order in Supabase
     const { error: updateError } = await supabase
       .from('orders')
       .update({
@@ -185,7 +183,6 @@ export async function createShipRocketOrder(orderId: string) {
       console.error('Failed to update order with ShipRocket details:', updateError);
     }
 
-    // Log success
     await supabase.from('shiprocket_logs').insert({
       order_id: orderId,
       action: 'create_order',
@@ -194,7 +191,6 @@ export async function createShipRocketOrder(orderId: string) {
       status: 'success',
     });
 
-    // Auto-generate AWB if possible
     if (shipRocketResponse.shipment_id) {
       await generateAWBForOrder(orderId, shipRocketResponse.shipment_id);
     }
@@ -209,7 +205,7 @@ export async function createShipRocketOrder(orderId: string) {
   } catch (error: any) {
     console.error('Error creating ShipRocket order:', error);
 
-    // Log error
+    const supabase = getSupabaseClient();
     await supabase.from('shiprocket_logs').insert({
       order_id: orderId,
       action: 'create_order',
@@ -225,6 +221,8 @@ export async function createShipRocketOrder(orderId: string) {
  * Generate AWB for shipment
  */
 export async function generateAWBForOrder(orderId: string, shipmentId: number) {
+  const supabase = getSupabaseClient(); // ✅ Create client here
+
   try {
     console.log(`Generating AWB for shipment: ${shipmentId}`);
 
@@ -232,7 +230,6 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
       shipment_id: shipmentId,
     });
 
-    // Extract AWB code from response
     const awbCode = awbResponse.response?.data?.awb_code || awbResponse.awb_code;
     const courierName = awbResponse.response?.data?.courier_name || awbResponse.courier_name;
     const courierId = awbResponse.response?.data?.courier_company_id || awbResponse.courier_company_id;
@@ -241,7 +238,6 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
       throw new Error('AWB code not generated');
     }
 
-    // Update order
     await supabase
       .from('orders')
       .update({
@@ -252,7 +248,6 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
       })
       .eq('id', orderId);
 
-    // Log success
     await supabase.from('shiprocket_logs').insert({
       order_id: orderId,
       action: 'generate_awb',
@@ -266,6 +261,7 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
   } catch (error: any) {
     console.error('Error generating AWB:', error);
 
+    const supabase = getSupabaseClient();
     await supabase.from('shiprocket_logs').insert({
       order_id: orderId,
       action: 'generate_awb',
@@ -273,7 +269,6 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
       error_message: error.message,
     });
 
-    // Don't throw error, AWB can be generated manually later
     return null;
   }
 }
@@ -282,6 +277,8 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
  * Schedule pickup for order
  */
 export async function schedulePickupForOrder(orderId: string) {
+  const supabase = getSupabaseClient(); // ✅ Create client here
+
   try {
     const { data: order } = await supabase
       .from('orders')
@@ -297,7 +294,6 @@ export async function schedulePickupForOrder(orderId: string) {
       shipment_id: [Number(order.shiprocket_shipment_id)],
     });
 
-    // Update order
     await supabase
       .from('orders')
       .update({
@@ -306,7 +302,6 @@ export async function schedulePickupForOrder(orderId: string) {
       })
       .eq('id', orderId);
 
-    // Log success
     await supabase.from('shiprocket_logs').insert({
       order_id: orderId,
       action: 'schedule_pickup',
@@ -318,6 +313,7 @@ export async function schedulePickupForOrder(orderId: string) {
   } catch (error: any) {
     console.error('Error scheduling pickup:', error);
 
+    const supabase = getSupabaseClient();
     await supabase.from('shiprocket_logs').insert({
       order_id: orderId,
       action: 'schedule_pickup',
