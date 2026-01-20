@@ -65,7 +65,7 @@ export default function PrivacyPolicyPage() {
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-light tracking-tight mb-6">
               Privacy<br />Policy
             </h1>
-            <div className="w-32 h-1 bg-gradient-to-r from-[#E3D9C6] to-transparent" />
+            <div className="w-32 h-1 bg-linear-to-r from-[#E3D9C6] to-transparent" />
             <p className="mt-8 text-xl text-[#E3D9C6]/70 max-w-3xl">
               Your privacy and trust matter to us. We are committed to protecting your personal information.
             </p>
@@ -79,7 +79,7 @@ export default function PrivacyPolicyPage() {
             className="mb-20"
           >
             <div className="border-2 border-[#E3D9C6]/30 p-10 md:p-12 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#E3D9C6]/10 to-transparent" />
+              <div className="absolute inset-0 bg-linear-to-br from-[#E3D9C6]/10 to-transparent" />
               <div className="relative z-10">
                 <div className="flex items-center gap-4 mb-6">
                   <Shield className="w-10 h-10 text-[#E3D9C6]" />
@@ -145,7 +145,7 @@ export default function PrivacyPolicyPage() {
                   className="border border-[#E3D9C6]/20 p-6 hover:border-[#E3D9C6]/40 transition-all duration-500 group"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-[#E3D9C6]/10 flex items-center justify-center flex-shrink-0 group-hover:bg-[#E3D9C6]/20 transition-colors">
+                    <div className="w-12 h-12 rounded-full bg-[#E3D9C6]/10 flex items-center justify-center shrink-0 group-hover:bg-[#E3D9C6]/20 transition-colors">
                       <item.icon className="w-6 h-6 text-[#E3D9C6]" />
                     </div>
                     <div>
@@ -204,7 +204,7 @@ export default function PrivacyPolicyPage() {
                   className="border border-[#E3D9C6]/20 p-8"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="w-2 h-2 rounded-full bg-[#E3D9C6] mt-2 flex-shrink-0" />
+                    <div className="w-2 h-2 rounded-full bg-[#E3D9C6] mt-2 shrink-0" />
                     <div>
                       <h3 className="text-xl font-light mb-3 text-[#E3D9C6]">{item.title}</h3>
                       <p className="text-[#E3D9C6]/70 leading-relaxed">{item.desc}</p>
@@ -295,7 +295,7 @@ export default function PrivacyPolicyPage() {
                   "Contact us with privacy concerns or questions",
                 ].map((right, i) => (
                   <div key={i} className="flex items-start gap-4">
-                    <CheckCircle className="w-6 h-6 text-[#E3D9C6] flex-shrink-0 mt-1" />
+                    <CheckCircle className="w-6 h-6 text-[#E3D9C6] shrink-0 mt-1" />
                     <p className="text-lg text-[#E3D9C6]/90">{right}</p>
                   </div>
                 ))}
@@ -311,7 +311,7 @@ export default function PrivacyPolicyPage() {
             className="text-center py-16"
           >
             <div className="border-2 border-[#E3D9C6]/30 p-12 md:p-16 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#E3D9C6]/10 via-transparent to-[#E3D9C6]/5" />
+              <div className="absolute inset-0 bg-linear-to-br from-[#E3D9C6]/10 via-transparent to-[#E3D9C6]/5" />
               <div className="relative z-10">
                 <Heart className="w-16 h-16 text-[#E3D9C6] mx-auto mb-8" />
                 <h3 className="text-3xl md:text-4xl font-light mb-6">Built on Trust</h3>

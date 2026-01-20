@@ -19,7 +19,7 @@ export default function ContactPage() {
 
   return (
     <main className="min-h-screen bg-[#E9DFCF] text-neutral-900">
-      <section className="mx-auto max-w-[900px] px-8 py-32">
+      <section className="mx-auto max-w-225 px-8 py-32">
         <h1 className="mb-4 text-3xl font-light">Contact Us</h1>
         <p className="mb-20 max-w-md text-sm text-neutral-600">
           Have a question about your order, sizing, or anything else?  

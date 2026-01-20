@@ -1,59 +1,79 @@
 // lib/supabase-orders.ts - UPDATED WITH INVENTORY MANAGEMENT
 
-import { supabase } from './supabase';
-import { validateStock, updateProductStock, restoreProductStock } from './inventory';
+import { supabase } from './supabase'
+import { validateStock, updateProductStock, restoreProductStock } from './inventory'
 
+// =====================
 // Types
-export interface Address {
-  id?: string;
-  user_id: string;
-  first_name: string;
-  last_name: string;
-  phone: string;
-  address_line1: string;
-  address_line2?: string;
-  city: string;
-  state: string;
-  postal_code: string;
-  country: string;
-  is_default: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
+// =====================
 
-export interface Order {
-  id?: string;
-  user_id: string;
-  order_number?: string;
-  items: OrderItem[];
-  subtotal: number;
-  tax: number;
-  shipping_cost: number;
-  total: number;
-  shipping_address: Address;
-  payment_method: string;
-  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
-  razorpay_order_id?: string;
-  razorpay_payment_id?: string;
-  razorpay_signature?: string;
-  order_status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  created_at?: string;
-  updated_at?: string;
-  paid_at?: string;
-  shipped_at?: string;
-  delivered_at?: string;
+export interface Address {
+  email: string
+  id?: string
+  user_id: string
+  first_name: string
+  last_name: string
+  phone: string
+  address_line1: string
+  address_line2?: string
+  city: string
+  state: string
+  postal_code: string
+  country: string
+  is_default: boolean
+  created_at?: string
+  updated_at?: string
 }
 
 export interface OrderItem {
-  product_id: number;
-  product_name: string;
-  product_image: string;
-  size: string;
-  color: string;
-  quantity: number;
-  price: number;
-  subtotal: number;
+  product_id: number
+  product_name: string
+  product_image: string
+  size: string
+  color: string
+  quantity: number
+  price: number
+  subtotal: number
 }
+
+export interface Order {
+  id?: string
+  user_id: string
+  order_number?: string
+
+  /** ✅ Email belongs to Order, NOT Address */
+  customer_email?: string
+
+  items: OrderItem[]
+  subtotal: number
+  tax: number
+  shipping_cost: number
+  total: number
+
+  shipping_address: Address
+
+  payment_method: string
+  payment_status: 'pending' | 'paid' | 'failed' | 'refunded'
+
+  razorpay_order_id?: string
+  razorpay_payment_id?: string
+  razorpay_signature?: string
+
+  order_status:
+    | 'pending'
+    | 'confirmed'
+    | 'processing'
+    | 'shipped'
+    | 'delivered'
+    | 'cancelled'
+
+  created_at?: string
+  updated_at?: string
+  paid_at?: string
+  shipped_at?: string
+  delivered_at?: string
+}
+
 
 // ========== ADDRESS FUNCTIONS ==========
 

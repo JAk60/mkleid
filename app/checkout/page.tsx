@@ -75,7 +75,8 @@ export default function CheckoutPage() {
     try {
       const newAddress = await createAddress({
         ...addressForm,
-        user_id: user!.id
+        user_id: user!.id,
+        email: ""
       })
       setAddresses(prev => [...prev, newAddress])
       setSelectedAddress(newAddress)
@@ -130,7 +131,7 @@ export default function CheckoutPage() {
       const orderData = {
         user_id: user.id,
         items: items.map(item => ({
-          product_id: parseInt(item?.id),
+          product_id: item?.id,
           product_name: item.name,
           product_image: item.image,
           size: item.size,

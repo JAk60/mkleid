@@ -95,7 +95,7 @@ export default function CategoryPage() {
         const range = filtered.length > 0 ? getPriceRange(filtered) : [0, 100];
         setFilters(prev => ({
           ...prev,
-          priceRange: range,
+          priceRange: range as [number, number],
           gender: parsedInfo.gender ? [parsedInfo.gender] : [],
           categories: [dbCategory]
         }));
@@ -120,7 +120,7 @@ export default function CategoryPage() {
     setFilters({
       gender: categoryInfo?.gender ? [categoryInfo.gender] : [],
       categories: categoryInfo?.category ? [categoryInfo.category] : [],
-      priceRange: priceRange,
+      priceRange: priceRange as [number, number],
       sizes: [],
       colors: [],
       inStock: false,
@@ -234,7 +234,7 @@ export default function CategoryPage() {
                 filters={filters}
                 onChange={setFilters}
                 availableColors={availableColors}
-                priceRange={priceRange}
+                priceRange={priceRange as [number, number]}
                 onReset={handleResetFilters}
               />
             </div>
@@ -260,7 +260,7 @@ export default function CategoryPage() {
                   filters={filters}
                   onChange={setFilters}
                   availableColors={availableColors}
-                  priceRange={priceRange}
+                  priceRange={priceRange as [number, number]}
                   onReset={handleResetFilters}
                 />
               </div>
