@@ -5,10 +5,11 @@ import Link from "next/link"
 import { useCart } from "@/context/cart-context"
 
 interface Product {
-  id: string
+  id: number
   name: string
   price: number
   image: string
+  color: string
   sizes: string[]
   description: string
   specs: string[]
@@ -31,7 +32,7 @@ export function ProductCard({ product }: { product: Product }) {
       name: product?.name,
       price: product?.price,
       size: selectedSize,
-      quantity,
+      color:product.color,
       image: product?.image,
     })
 
