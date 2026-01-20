@@ -1,4 +1,3 @@
-
 // ========================================
 // app/api/razorpay/create-order/route.ts - WITH RATE LIMITING
 // ========================================
@@ -8,10 +7,21 @@ import Razorpay from 'razorpay';
 import { convertToPaise } from '@/lib/razorpay';
 import { rateLimit, getClientIdentifier } from '@/lib/rate-limit';
 
-const razorpay = new Razorpay({
-  key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+let razorpayInstance: Razorpay | null = null;
+
+function getRazorpay(): Razorpay {
+  if (!razorpayInstance) {
+    const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '';
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || '';
+
+    razorpayInstance = new Razorpay({
+      key_id: keyId,
+      key_secret: keySecret,
+    });
+  }
+
+  return razorpayInstance;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,6 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Razorpay order
+    const razorpay = getRazorpay();
     const order = await razorpay.orders.create({
       amount: convertToPaise(amount),
       currency,
@@ -103,5 +114,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-
