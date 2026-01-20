@@ -22,14 +22,10 @@ if (fs.existsSync(serverFunctionsPath)) {
   });
 }
 
-// Create _worker.js that imports the actual worker
-const workerContent = `
-import server from './server-functions/default/index.mjs';
+// Create _worker.js with proper module syntax
+const workerContent = `export { default } from './server-functions/default/index.mjs';`;
 
-export default server;
-`;
-
-fs.writeFileSync('.open-next/_worker.js', workerContent.trim());
+fs.writeFileSync('.open-next/_worker.js', workerContent);
 console.log('\n✓ Created _worker.js');
 
 // Create _routes.json for proper routing
