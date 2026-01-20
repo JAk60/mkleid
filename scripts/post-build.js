@@ -3,7 +3,7 @@ const path = require('path');
 
 console.log('📦 Starting post-build processing...');
 
-// List all files in server-functions
+// List server-functions contents
 const serverFunctionsPath = '.open-next/server-functions';
 if (fs.existsSync(serverFunctionsPath)) {
   console.log('\n📂 Contents of server-functions:');
@@ -13,7 +13,6 @@ if (fs.existsSync(serverFunctionsPath)) {
     const stats = fs.statSync(fullPath);
     console.log(`  ${stats.isDirectory() ? '📂' : '📄'} ${file}`);
     
-    // If it's a directory, list its contents too
     if (stats.isDirectory()) {
       const subFiles = fs.readdirSync(fullPath);
       subFiles.forEach(subFile => {
@@ -23,14 +22,27 @@ if (fs.existsSync(serverFunctionsPath)) {
   });
 }
 
-// Check for .build directory
-const buildPath = '.open-next/.build';
-if (fs.existsSync(buildPath)) {
-  console.log('\n📂 Contents of .build:');
-  const buildFiles = fs.readdirSync(buildPath);
-  buildFiles.forEach(file => {
-    console.log(`  📄 ${file}`);
-  });
-}
+// Create _worker.js that imports the actual worker
+const workerContent = `
+import server from './server-functions/default/index.mjs';
+
+export default server;
+`;
+
+fs.writeFileSync('.open-next/_worker.js', workerContent.trim());
+console.log('\n✓ Created _worker.js');
+
+// Create _routes.json for proper routing
+const routesConfig = {
+  version: 1,
+  include: ['/*'],
+  exclude: []
+};
+
+fs.writeFileSync(
+  '.open-next/_routes.json',
+  JSON.stringify(routesConfig, null, 2)
+);
+console.log('✓ Created _routes.json');
 
 console.log('\n✅ Post-build processing complete!');
