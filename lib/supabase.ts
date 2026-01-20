@@ -1,16 +1,30 @@
 // lib/supabase.ts
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { Product } from "./types";
 
-// Don't throw errors at import time - use empty strings as fallback
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+let supabaseInstance: SupabaseClient | null = null;
 
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDUxOTI4MDAsImV4cCI6MTk2MDc2ODgwMH0.placeholder'
-);
+function getSupabase(): SupabaseClient {
+  if (!supabaseInstance) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+    supabaseInstance = createClient(
+      supabaseUrl || 'https://placeholder.supabase.co',
+      supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDUxOTI4MDAsImV4cCI6MTk2MDc2ODgwMH0.placeholder'
+    );
+  }
+
+  return supabaseInstance;
+}
+
+// Export using Proxy for lazy initialization
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(target, prop) {
+    return getSupabase()[prop as keyof SupabaseClient];
+  }
+});
 
 // Helper function to fetch images and size chart for a product
 async function enrichProductWithDetails(product: any): Promise<Product> {
