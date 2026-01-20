@@ -2,12 +2,12 @@
   "name": "my-v0-project",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
+ "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "pages:build": "open-next build --provider cloudflare",
-    "pages:deploy": "npm run pages:build && wrangler pages deploy .open-next/worker",
+    "pages:build": "open-next build --provider cloudflare && node scripts/post-build.js",
+    "pages:deploy": "npm run pages:build && wrangler pages deploy .open-next",
     "cf:dev": "wrangler pages dev .open-next/worker --compatibility-date=2024-09-02 --compatibility-flag=nodejs_compat"
   },
   "dependencies": {
