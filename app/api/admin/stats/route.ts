@@ -42,7 +42,7 @@ export async function GET() {
     }
 
     // Get low stock products (stock <= 5)
-    let lowStockProducts = [];
+    let lowStockProducts: Array<{ id: string; name: string; stock: number; image_url: string; price: number }> = [];
     try {
       const { data: lowStock, error: lowStockError } = await supabase
         .from('products')
@@ -60,7 +60,7 @@ export async function GET() {
     }
 
     // Get recent orders
-    let recentOrders = [];
+    let recentOrders: { id: any; orderNumber: any; customer: string; amount: any; status: any; paymentStatus: any; date: any; }[] = [];
     try {
       const { data: orders, error: recentError } = await supabase
         .from('orders')
@@ -115,10 +115,11 @@ export async function GET() {
 
   } catch (error) {
     console.error('❌ Stats API Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch statistics';
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Failed to fetch statistics',
+        error: errorMessage,
         data: {
           totalProducts: 0,
           totalOrders: 0,
