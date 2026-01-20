@@ -2,7 +2,6 @@
 
 export interface Product {
     size_chart: any;
-    size_chart: any;
     has_size_chart: any;
 	id: number;
 	name: string;
